@@ -21,10 +21,11 @@ class QuestionOptionSerializer(serializers.ModelSerializer):
 
 class QuestionSerializer(serializers.ModelSerializer):
     options = serializers.ListField(
-        child=serializers.CharField(max_length=200),
+        child=serializers.DictField(),
         write_only=True,
         required=False
     )
+    
     
     class Meta:
         model = Question
@@ -38,7 +39,8 @@ class QuestionSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         # Include options in response
         if instance.type in ['choice', 'multiple_choice']:
-            data['options'] = [opt.value for opt in instance.options.all()]
+            print("instance type: ",instance.options.all())
+            data['options'] = [{opt.label:opt.value} for opt in instance.options.all()]
         return data
 
 
@@ -130,6 +132,7 @@ class ServiceSerializer(serializers.ModelSerializer):
 
             # Create questions
             for question_data in questions_data:
+                print("question data: ", question_data)
                 options_data = question_data.pop('options', [])
                 question = Question.objects.create(
                     service=service,
@@ -139,14 +142,15 @@ class ServiceSerializer(serializers.ModelSerializer):
                     is_required=question_data.get('is_required', False),
                     order=question_data.get('order', 0)
                 )
-
-                # Create question options
-                for i, option_value in enumerate(options_data):
+                for i, option_dict in enumerate(options_data):
+                    key, value = list(option_dict.items())[0]  # Unpack the first (and only) key-value pair
                     QuestionOption.objects.create(
                         question=question,
-                        value=option_value,
+                        value=value,
+                        label=key,
                         order=i
                     )
+
 
             # Create pricing options
             for pricing_data in pricing_options_data:
@@ -157,7 +161,7 @@ class ServiceSerializer(serializers.ModelSerializer):
                     name=pricing_data['name'],
                     discount=pricing_data.get('discount', 0),
                     base_price=pricing_data.get('base_price', 0),
-                    pricing_type=pricing_data.get('pricing_type', 'monthly')
+                    pricing_type=pricing_data.get('pricing_type', '')
                 )
 
                 # Link features to pricing options
@@ -215,11 +219,15 @@ class ServiceSerializer(serializers.ModelSerializer):
                     is_required=question_data.get('is_required', False),
                     order=question_data.get('order', 0)
                 )
-
+                print("option DataL ", options_data)
                 for i, option_value in enumerate(options_data):
+                    print(option_value)
+                    key, value = list(option_value.items())[0]
+
                     QuestionOption.objects.create(
                         question=question,
-                        value=option_value,
+                        value=value,
+                        label=key,
                         order=i
                     )
 

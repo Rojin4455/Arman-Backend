@@ -148,7 +148,7 @@ class PricingOptionFeature(models.Model):
     )
     feature = models.ForeignKey(
         Feature, 
-        on_delete=models.CASCADE, 
+        on_delete=models.CASCADE,
         related_name='pricing_options'
     )
     is_included = models.BooleanField(default=False)
