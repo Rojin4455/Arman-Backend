@@ -9,4 +9,6 @@ urlpatterns = [
     path("webhook",webhook_handler),
     path('contacts/search/', ContactSearchView.as_view(), name='contact-search'),
     path('api/', include(router.urls)),
+    path('purchase/', CreatePurchaseView.as_view(), name='create-purchase'),
+
 ]
