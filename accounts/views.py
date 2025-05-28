@@ -99,7 +99,7 @@ class LoginView(APIView):
         password = request.data.get('password')
         
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.filter(email=email).first()
         except User.DoesNotExist:
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
