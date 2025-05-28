@@ -17,6 +17,8 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from .models import Service
 from .serializers import ServiceSerializer
+from .serializers import PurchaseCreateSerializer
+from rest_framework.views import APIView
 
 
 
@@ -162,3 +164,14 @@ class ServiceViewSet(viewsets.ModelViewSet):
         
         return Response(new_serializer.data, status=status.HTTP_201_CREATED)
 
+
+
+
+
+class CreatePurchaseView(APIView):
+    def post(self, request):
+        serializer = PurchaseCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            purchase = serializer.save()
+            return Response({"message": "Purchase created successfully", "id": purchase.id}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

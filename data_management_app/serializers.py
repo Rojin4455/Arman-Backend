@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db import transaction
 from .models import (
     Service, Feature, PricingOption, PricingOptionFeature, 
-    Question, QuestionOption, Contact
+    Question, QuestionOption, Contact, Purchase
 )
 
 class ContactSerializer(serializers.ModelSerializer):
@@ -281,3 +281,42 @@ class ServiceSerializer(serializers.ModelSerializer):
         
         data['pricingOptions'] = pricing_options
         return data
+
+
+
+class PurchaseCreateSerializer(serializers.ModelSerializer):
+    contact_id = serializers.CharField()
+    service_id = serializers.IntegerField()
+    price_plan_id = serializers.IntegerField()
+
+    class Meta:
+        model = Purchase
+        fields = ['contact_id', 'service_id', 'price_plan_id', 'total_amount']
+
+    def create(self, validated_data):
+        contact_id = validated_data.pop('contact_id')
+        service_id = validated_data.pop('service_id')
+        price_plan_id = validated_data.pop('price_plan_id')
+
+        try:
+            contact = Contact.objects.get(contact_id=contact_id)
+        except Contact.DoesNotExist:
+            raise serializers.ValidationError({"contact_id": "Contact not found."})
+
+        try:
+            service = Service.objects.get(id=service_id)
+        except Service.DoesNotExist:
+            raise serializers.ValidationError({"service_id": "Service not found."})
+
+        try:
+            price_plan = PricingOption.objects.get(id=price_plan_id)
+        except PricingOption.DoesNotExist:
+            raise serializers.ValidationError({"price_plan_id": "Pricing plan not found."})
+
+        purchase = Purchase.objects.create(
+            contact=contact,
+            service=service,
+            price_plan=price_plan,
+            total_amount=validated_data['total_amount']
+        )
+        return purchase
