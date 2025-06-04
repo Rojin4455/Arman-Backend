@@ -2,7 +2,8 @@
 __pycache__/
 *.pyc
 env
-
+**/migrations/*.py
+!**/migrations/__init__.py
 
 *.pyo
 *.pyd

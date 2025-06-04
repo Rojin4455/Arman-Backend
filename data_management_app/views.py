@@ -15,9 +15,9 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from .models import Service
+from .models import Service, GlobalSettings
 from .serializers import ServiceSerializer
-from .serializers import PurchaseCreateSerializer
+from .serializers import PurchaseCreateSerializer, GlobalSettingsSerializer
 from rest_framework.views import APIView
 
 
@@ -175,3 +175,18 @@ class CreatePurchaseView(APIView):
             purchase = serializer.save()
             return Response({"message": "Purchase created successfully", "id": purchase.id}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class globalsettingsView(APIView):
+    def get(self, request):
+        global_settings = GlobalSettings.load()
+        serializer = GlobalSettingsSerializer(global_settings)
+        return Response(serializer.data)
+
+    def post(self, request):
+        global_settings = GlobalSettings.load()
+        serializer = GlobalSettingsSerializer(global_settings, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=200)
+        return Response(serializer.errors, status=400)
+    

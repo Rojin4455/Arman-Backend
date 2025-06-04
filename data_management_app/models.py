@@ -31,8 +31,30 @@ class Contact(models.Model):
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.email})"
     
+class SingletonModel(models.Model):
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, created = cls.objects.get_or_create(pk=1, defaults={'minimum_price': 0})
+        return obj
 
 
+class GlobalSettings(SingletonModel):
+    minimum_price = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        validators=[MinValueValidator(0)],
+        help_text="Minimum price for this service"
+    )
+
+    def __str__(self):
+        return "Global Settings"
 
 
 class Service(models.Model):
@@ -42,12 +64,6 @@ class Service(models.Model):
 
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
-    minimum_price = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        validators=[MinValueValidator(0)],
-        help_text="Minimum price for this service"
-    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -86,26 +102,12 @@ class PricingOption(models.Model):
     """
     Different pricing options for a service (e.g., monthly, quarterly)
     """
-    PRICING_TYPES = [
-        ('monthly', 'Monthly'),
-        ('quarterly', 'Quarterly'),
-        ('yearly', 'Yearly'),
-        ('one_time', 'One Time'),
-        ('custom', 'Custom'),
-    ]
-
-
     service = models.ForeignKey(
         Service, 
         on_delete=models.CASCADE, 
         related_name='pricing_options'
     )
     name = models.CharField(max_length=100)
-    pricing_type = models.CharField(
-        max_length=20, 
-        choices=PRICING_TYPES, 
-        default='monthly'
-    )
     discount = models.DecimalField(
         max_digits=5, 
         decimal_places=2, 

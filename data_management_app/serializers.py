@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db import transaction
 from .models import (
     Service, Feature, PricingOption, PricingOptionFeature, 
-    Question, QuestionOption, Contact, Purchase
+    Question, QuestionOption, Contact, Purchase, GlobalSettings
 )
 
 class ContactSerializer(serializers.ModelSerializer):
@@ -63,7 +63,7 @@ class PricingOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = PricingOption
         fields = [
-            'id', 'name', 'discount', 'base_price', 'pricing_type', 
+            'id', 'name', 'discount', 'base_price', 
             'selectedFeatures', 'is_active'
         ]
         extra_kwargs = {
@@ -92,7 +92,7 @@ class ServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
         fields = [
-            'id', 'name', 'description', 'minimum_price', 'minimumPrice',
+            'id', 'name', 'description', 'minimumPrice',
             'features', 'pricingOptions', 'questions', 
             'is_active', 'created_at', 'updated_at'
         ]
@@ -100,12 +100,10 @@ class ServiceSerializer(serializers.ModelSerializer):
             'id': {'read_only': True},
             'created_at': {'read_only': True},
             'updated_at': {'read_only': True},
-            'minimum_price': {'read_only': True}  # Only show in output
         }
 
     def create(self, validated_data):
         # Handle both camelCase and snake_case
-        minimum_price = validated_data.pop('minimumPrice', None) or validated_data.get('minimum_price', 0)
         pricing_options_data = validated_data.pop('pricingOptions', [])
         features_data = validated_data.pop('features', [])
         questions_data = validated_data.pop('questions', [])
@@ -114,8 +112,7 @@ class ServiceSerializer(serializers.ModelSerializer):
             # Create service
             service = Service.objects.create(
                 name=validated_data['name'],
-                description=validated_data.get('description', ''),
-                minimum_price=minimum_price
+                description=validated_data.get('description', '')
             )
 
             # Create features
@@ -161,7 +158,6 @@ class ServiceSerializer(serializers.ModelSerializer):
                     name=pricing_data['name'],
                     discount=pricing_data.get('discount', 0),
                     base_price=pricing_data.get('base_price', 0),
-                    pricing_type=pricing_data.get('pricing_type', '')
                 )
 
                 # Link features to pricing options
@@ -178,7 +174,6 @@ class ServiceSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         # Handle both camelCase and snake_case
-        minimum_price = validated_data.pop('minimumPrice', None) or validated_data.get('minimum_price')
         pricing_options_data = validated_data.pop('pricingOptions', []) or validated_data.pop('pricing_options', [])
         features_data = validated_data.pop('features', [])
         questions_data = validated_data.pop('questions', [])
@@ -187,8 +182,6 @@ class ServiceSerializer(serializers.ModelSerializer):
             # Update service basic info
             instance.name = validated_data.get('name', instance.name)
             instance.description = validated_data.get('description', instance.description)
-            if minimum_price is not None:
-                instance.minimum_price = minimum_price
             instance.save()
 
             # Clear existing relationships
@@ -243,7 +236,6 @@ class ServiceSerializer(serializers.ModelSerializer):
                     name=pricing_data['name'],
                     discount=pricing_data.get('discount', 0),
                     base_price=pricing_data.get('base_price', 0),
-                    pricing_type=pricing_data.get('pricing_type', 'monthly')
                 )
 
                 for selected_feature in selected_features_data:
@@ -267,7 +259,6 @@ class ServiceSerializer(serializers.ModelSerializer):
                 'name': po.name,
                 'discount': po.discount,
                 'base_price': po.base_price,
-                'pricing_type': po.pricing_type,
                 'is_active': po.is_active,
                 'selectedFeatures': []
             }
@@ -320,3 +311,13 @@ class PurchaseCreateSerializer(serializers.ModelSerializer):
             total_amount=validated_data['total_amount']
         )
         return purchase
+    
+class GlobalSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GlobalSettings
+        fields = '__all__'
+    
+    def update(self, instance, data):
+        instance.minimum_price = data.get('minimum_price')
+        instance.save()
+        return instance
