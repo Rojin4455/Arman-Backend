@@ -33,7 +33,7 @@ BASE_API_URL = config("BASE_API_URL")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '4b51-2401-4900-6661-4824-4c07-dbb4-9f64-34d8.ngrok-free.app']
+ALLOWED_HOSTS = ['13.58.160.114','127.0.0.1','quote.theservicepilot.com', 'localhost', '4b51-2401-4900-6661-4824-4c07-dbb4-9f64-34d8.ngrok-free.app']
 
 
 # Application definition
