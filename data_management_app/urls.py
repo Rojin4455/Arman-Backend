@@ -10,5 +10,6 @@ urlpatterns = [
     path('contacts/search/', ContactSearchView.as_view(), name='contact-search'),
     path('api/', include(router.urls)),
     path('purchase/', CreatePurchaseView.as_view(), name='create-purchase'),
+    path('user/review/<int:id>/', ReviewView.as_view()),
     path('globalsettings/update/', globalsettingsView.as_view()),
 ]

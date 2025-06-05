@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db import transaction
 from .models import (
     Service, Feature, PricingOption, PricingOptionFeature, 
-    Question, QuestionOption, Contact, Purchase, GlobalSettings
+    Question, QuestionOption, Contact, Purchase, GlobalSettings, SavedPricingPlan, QuestionsAndAnswers
 )
 
 class ContactSerializer(serializers.ModelSerializer):
@@ -272,44 +272,147 @@ class ServiceSerializer(serializers.ModelSerializer):
         
         data['pricingOptions'] = pricing_options
         return data
+    
+class QuestionsAndAnswersSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuestionsAndAnswers
+        exclude = ['purchase', 'question']
+    
+class QuestionWithAnswerSerializer(serializers.ModelSerializer):
+    reactions = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Question
+        fields = ['id', 'text', 'type', 'unit_price', 'options', 'is_required', 'order', 'reactions']
+
+    def get_reactions(self, obj):
+        purchase = self.context.get('purchase')
+        print(purchase, 'sss')
+        if not purchase:
+            return None
+        try:
+            answer = QuestionsAndAnswers.objects.get(purchase=purchase, question=obj)
+            return QuestionsAndAnswersSerializer(answer).data
+        except QuestionsAndAnswers.DoesNotExist:
+            return None
+    
+class ServiceWithQuestionsSerializer(serializers.ModelSerializer):
+    features = FeatureSerializer(many=True, required=False)
+    pricingOptions = PricingOptionSerializer(many=True, required=False)
+    questions = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Service
+        fields = ['id', 'name', 'description', 'features', 'pricingOptions', 'questions', 
+            'is_active', 'created_at', 'updated_at']
+
+    def get_questions(self, obj):
+        purchase = self.context.get('purchase')
+        questions = obj.questions.all()
+        return QuestionWithAnswerSerializer(questions, many=True, context={'purchase': purchase}).data
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Add pricing options for read operations
+        pricing_options = []
+        for po in instance.pricing_options.all():
+            po_data = {
+                'id': po.id,
+                'name': po.name,
+                'discount': po.discount,
+                'base_price': po.base_price,
+                'is_active': po.is_active,
+                'selectedFeatures': []
+            }
+            # Add selected features
+            for pof in po.selected_features.all():
+                po_data['selectedFeatures'].append({
+                    'id': pof.feature.id,
+                    'is_included': pof.is_included
+                })
+            pricing_options.append(po_data)
+        
+        data['pricingOptions'] = pricing_options
+        return data
 
 
+class SavedPricingPlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SavedPricingPlan
+        fields = '__all__'
 
-class PurchaseCreateSerializer(serializers.ModelSerializer):
-    contact_id = serializers.CharField()
-    service_id = serializers.IntegerField()
-    price_plan_id = serializers.IntegerField()
+class PurchaseDetailSerializer(serializers.ModelSerializer):
+    contact = ContactSerializer()
+    services = serializers.SerializerMethodField()
+    price_plan = serializers.SerializerMethodField()
 
     class Meta:
         model = Purchase
-        fields = ['contact_id', 'service_id', 'price_plan_id', 'total_amount']
+        fields = ['id', 'contact', 'services', 'total_amount', 'price_plan', 'is_submited']
+
+    def get_services(self, obj):
+        return ServiceWithQuestionsSerializer(
+            obj.services.all(),
+            many=True,
+            context={'purchase': obj}
+        ).data
+
+    def get_price_plan(self, instance):
+        if instance.is_submited:
+            spp = SavedPricingPlan.objects.filter(purchase=instance).first()
+            if spp:
+                return SavedPricingPlanSerializer(spp).data
+        return instance.price_plan.id
+    
+class QuestionAnswerInputSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    qty = serializers.CharField()
+    ans = serializers.BooleanField()
+
+class ServiceWithAnswersInputSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    questions = QuestionAnswerInputSerializer(many=True)
+
+class PurchaseCreateSerializer(serializers.Serializer):
+    contact = serializers.SlugRelatedField(
+        slug_field='contact_id',
+        queryset=Contact.objects.all()
+    )
+    services = ServiceWithAnswersInputSerializer(many=True)
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    price_plan = serializers.PrimaryKeyRelatedField(queryset=PricingOption.objects.all())
+    is_submited = serializers.BooleanField(read_only=True)
 
     def create(self, validated_data):
-        contact_id = validated_data.pop('contact_id')
-        service_id = validated_data.pop('service_id')
-        price_plan_id = validated_data.pop('price_plan_id')
-
-        try:
-            contact = Contact.objects.get(contact_id=contact_id)
-        except Contact.DoesNotExist:
-            raise serializers.ValidationError({"contact_id": "Contact not found."})
-
-        try:
-            service = Service.objects.get(id=service_id)
-        except Service.DoesNotExist:
-            raise serializers.ValidationError({"service_id": "Service not found."})
-
-        try:
-            price_plan = PricingOption.objects.get(id=price_plan_id)
-        except PricingOption.DoesNotExist:
-            raise serializers.ValidationError({"price_plan_id": "Pricing plan not found."})
+        contact = validated_data['contact']
+        total_amount = validated_data['total_amount']
+        services_data = validated_data['services']
+        price_plan = validated_data['price_plan']
 
         purchase = Purchase.objects.create(
             contact=contact,
-            service=service,
-            price_plan=price_plan,
-            total_amount=validated_data['total_amount']
+            total_amount=total_amount,
+            price_plan=price_plan
         )
+
+        service_ids = []
+        for service_data in services_data:
+            service_id = service_data['id']
+            service_ids.append(service_id)
+            questions = service_data['questions']
+            for q in questions:
+                try:
+                    question_obj = Question.objects.get(id=q['id'])
+                    QuestionsAndAnswers.objects.create(
+                        purchase=purchase,
+                        question=question_obj,
+                        qty=q['qty'],
+                        ans=q['ans']
+                    )
+                except Question.DoesNotExist:
+                    raise serializers.ValidationError(f"Question with id {q['id']} not found")
+
+        purchase.services.set(service_ids)
         return purchase
     
 class GlobalSettingsSerializer(serializers.ModelSerializer):
