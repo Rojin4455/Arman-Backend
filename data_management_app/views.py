@@ -172,7 +172,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
 class CreatePurchaseView(APIView):
     def post(self, request):
-        contact_id=request.data.get('contact')
+        # contact_id=request.data.get('contact')
         serializer = PurchaseCreateSerializer(data=request.data)
         if serializer.is_valid():
             purchase = serializer.save()
