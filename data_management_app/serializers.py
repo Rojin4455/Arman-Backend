@@ -291,8 +291,8 @@ class QuestionWithAnswerSerializer(serializers.ModelSerializer):
         if not purchase:
             return None
         try:
-            answer = QuestionsAndAnswers.objects.get(purchase=purchase, question=obj)
-            return QuestionsAndAnswersSerializer(answer).data
+            answer = QuestionsAndAnswers.objects.filter(purchase=purchase, question=obj)
+            return QuestionsAndAnswersSerializer(answer, many=True).data
         except QuestionsAndAnswers.DoesNotExist:
             return None
     
