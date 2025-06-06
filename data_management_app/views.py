@@ -172,18 +172,18 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
 class CreatePurchaseView(APIView):
     def post(self, request):
-        # contact_id=request.data.get('contact')
+        contact_id=request.data.get('contact')
         serializer = PurchaseCreateSerializer(data=request.data)
         if serializer.is_valid():
             purchase = serializer.save()
-            # data = {"customFields": [
-            #     {
-            #         "id": "6dvNaf7VhkQ9snc5vnjJ", #custom field id
-            #         "key": "my_custom_field",   #custom field key
-            #         "field_value": f'{settings.FRONTEND_URL}/user/review/{purchase.id}/'
-            #     }
-            # ]}
-            # res = update_contact(contact_id, data)
+            data = {"customFields": [
+                {
+                    "id": "eTxp4zRWHRxg19omqedG", #custom field id
+                    "key": "my_custom_field",   #custom field key
+                    "field_value": f'{settings.FRONTEND_URL}/user/review/{purchase.id}/'
+                }
+            ]}
+            res = update_contact(contact_id, data)
             return Response({"message": "Purchase created successfully", "id": purchase.id}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
