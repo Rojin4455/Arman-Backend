@@ -297,5 +297,7 @@ class SavedPricingPlan(models.Model):
 class QuestionsAndAnswers(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name='answers')
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='questionsandanswers')
-    qty = models.CharField(max_length=200)
+    qty = models.CharField(max_length=200, null=True, blank=True)
     ans = models.BooleanField(default=False)
+    option_value = models.CharField(max_length=200, null=True, blank=True)
+    question_option = models.ForeignKey(QuestionOption, on_delete=models.CASCADE, related_name='answers', null=True, blank=True)

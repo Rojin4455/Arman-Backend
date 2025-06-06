@@ -24,6 +24,7 @@ SCOPES = config('SCOPES')
 REDIRECT_URI = config('REDIRECT_URI')
 TOKEN_URL = config("TOKEN_URL")
 BASE_API_URL = config("BASE_API_URL")
+FRONTEND_URL = config("FRONTEND_URL")   
 
 
 # Quick-start development settings - unsuitable for production

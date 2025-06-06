@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from data_management_app.tasks import handle_webhook_event
 import json
+from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from data_management_app.models import WebhookLog
@@ -19,6 +20,7 @@ from .models import Service, GlobalSettings, Purchase
 from .serializers import ServiceSerializer
 from .serializers import PurchaseCreateSerializer, GlobalSettingsSerializer, PurchaseDetailSerializer
 from rest_framework.views import APIView
+from .utils import update_contact
 
 
 
@@ -170,10 +172,18 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
 class CreatePurchaseView(APIView):
     def post(self, request):
-        print('data structure in create purchase view====',request.data)
+        # contact_id=request.data.get('contact')
         serializer = PurchaseCreateSerializer(data=request.data)
         if serializer.is_valid():
             purchase = serializer.save()
+            # data = {"customFields": [
+            #     {
+            #         "id": "6dvNaf7VhkQ9snc5vnjJ", #custom field id
+            #         "key": "my_custom_field",   #custom field key
+            #         "field_value": f'{settings.FRONTEND_URL}/user/review/{purchase.id}/'
+            #     }
+            # ]}
+            # res = update_contact(contact_id, data)
             return Response({"message": "Purchase created successfully", "id": purchase.id}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     

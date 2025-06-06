@@ -274,12 +274,19 @@ class ServiceSerializer(serializers.ModelSerializer):
         return data
     
 class QuestionsAndAnswersSerializer(serializers.ModelSerializer):
+    question_option = serializers.SerializerMethodField()
     class Meta:
         model = QuestionsAndAnswers
-        exclude = ['purchase', 'question']
+        fields = ['question_option', 'option_value', 'qty', 'ans']
+    def get_question_option(self, instance):
+        if instance.question.type == 'choice':
+            return QuestionOptionSerializer(instance.question_option).data
+        return None
+
     
 class QuestionWithAnswerSerializer(serializers.ModelSerializer):
     reactions = serializers.SerializerMethodField()
+    
 
     class Meta:
         model = Question
@@ -403,12 +410,18 @@ class PurchaseCreateSerializer(serializers.Serializer):
             for q in questions:
                 try:
                     question_obj = Question.objects.get(id=q['id'])
-                    QuestionsAndAnswers.objects.create(
-                        purchase=purchase,
-                        question=question_obj,
-                        qty=q['qty'],
-                        ans=q['ans']
-                    )
+                    if question_obj.type=='boolean':
+                        QuestionsAndAnswers.objects.create(
+                            purchase=purchase,
+                            question=question_obj,
+                            ans=q['ans']
+                        )
+                    else:
+                        QuestionsAndAnswers.objects.create(
+                            purchase=purchase,
+                            question=question_obj,
+                            ans=q['ans']
+                        )
                 except Question.DoesNotExist:
                     raise serializers.ValidationError(f"Question with id {q['id']} not found")
 
