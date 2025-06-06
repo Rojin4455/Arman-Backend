@@ -277,7 +277,7 @@ class QuestionsAndAnswersSerializer(serializers.ModelSerializer):
     question_option = serializers.SerializerMethodField()
     class Meta:
         model = QuestionsAndAnswers
-        fields = ['question_option', 'option_value', 'qty', 'ans']
+        fields = ['question_option', 'qty', 'ans']
     def get_question_option(self, instance):
         if instance.question.type == 'choice':
             return QuestionOptionSerializer(instance.question_option).data
@@ -420,7 +420,8 @@ class PurchaseCreateSerializer(serializers.Serializer):
                         QuestionsAndAnswers.objects.create(
                             purchase=purchase,
                             question=question_obj,
-                            ans=q['ans']
+                            ans=q['ans'],
+                            question_option=q['question_option']
                         )
                 except Question.DoesNotExist:
                     raise serializers.ValidationError(f"Question with id {q['id']} not found")
