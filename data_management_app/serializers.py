@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db import transaction
 from .models import (
     Service, Feature, PricingOption, PricingOptionFeature, 
-    Question, QuestionOption, Contact, Purchase, GlobalSettings, SavedPricingPlan, QuestionsAndAnswers, QuestionOptionAnswers
+    Question, QuestionOption, Contact, Purchase, GlobalSettings, PurchasedServicePlan, QuestionsAndAnswers, QuestionOptionAnswers
 )
 
 class ContactSerializer(serializers.ModelSerializer):
@@ -316,18 +316,24 @@ class QuestionWithAnswerSerializer(serializers.ModelSerializer):
     
 class ServiceWithQuestionsSerializer(serializers.ModelSerializer):
     features = FeatureSerializer(many=True, required=False)
+    price_plan = serializers.SerializerMethodField()
     pricingOptions = PricingOptionSerializer(many=True, required=False)
     questions = serializers.SerializerMethodField()
 
     class Meta:
         model = Service
-        fields = ['id', 'name', 'description', 'features', 'pricingOptions', 'questions', 
+        fields = ['id', 'name', 'description', 'features', 'pricingOptions', 'price_plan', 'questions', 
             'is_active', 'created_at', 'updated_at']
 
     def get_questions(self, obj):
         purchase = self.context.get('purchase')
         questions = obj.questions.all()
         return QuestionWithAnswerSerializer(questions, many=True, context={'purchase': purchase}).data
+    
+    def get_price_plan(self, instance):
+        purchase = self.context.get('purchase')
+        spp = PurchasedServicePlan.objects.filter(purchase=purchase, service=instance).first()
+        return PurchasedServicePlanSerializer(spp).data
     
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -354,19 +360,29 @@ class ServiceWithQuestionsSerializer(serializers.ModelSerializer):
         return data
 
 
-class SavedPricingPlanSerializer(serializers.ModelSerializer):
+class PurchasedServicePlanSerializer(serializers.ModelSerializer):
     class Meta:
-        model = SavedPricingPlan
-        fields = '__all__'
+        model = PurchasedServicePlan
+        exclude = ['purchase', 'service', 'id']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.purchase.is_submited:
+            return {
+                'plan_name': data['plan_name'],
+                'discount': data['discount'],
+                'base_price': data['base_price'],
+            }
+        else:
+            return {k: v for k, v in data.items() if k not in ['plan_name', 'discount', 'base_price']}
 
 class PurchaseDetailSerializer(serializers.ModelSerializer):
     contact = ContactSerializer()
     services = serializers.SerializerMethodField()
-    price_plan = serializers.SerializerMethodField()
 
     class Meta:
         model = Purchase
-        fields = ['id', 'contact', 'services', 'total_amount', 'price_plan', 'is_submited']
+        fields = ['id', 'contact', 'services', 'total_amount', 'is_submited']
 
     def get_services(self, obj):
         return ServiceWithQuestionsSerializer(
@@ -374,13 +390,6 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
             many=True,
             context={'purchase': obj}
         ).data
-
-    def get_price_plan(self, instance):
-        if instance.is_submited:
-            spp = SavedPricingPlan.objects.filter(purchase=instance).first()
-            if spp:
-                return SavedPricingPlanSerializer(spp).data
-        return instance.price_plan.id
     
 class QuestionAnswerInputSerializer(serializers.Serializer):
     id = serializers.IntegerField()
@@ -392,6 +401,7 @@ class QuestionAnswerInputSerializer(serializers.Serializer):
 
 class ServiceWithAnswersInputSerializer(serializers.Serializer):
     id = serializers.IntegerField()
+    price_plan = serializers.PrimaryKeyRelatedField(queryset=PricingOption.objects.all())
     questions = QuestionAnswerInputSerializer(many=True)
 
 class PurchaseCreateSerializer(serializers.Serializer):
@@ -401,26 +411,35 @@ class PurchaseCreateSerializer(serializers.Serializer):
     )
     services = ServiceWithAnswersInputSerializer(many=True)
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    price_plan = serializers.PrimaryKeyRelatedField(queryset=PricingOption.objects.all())
     is_submited = serializers.BooleanField(read_only=True)
 
     def create(self, validated_data):
         contact = validated_data['contact']
         total_amount = validated_data['total_amount']
         services_data = validated_data['services']
-        price_plan = validated_data['price_plan']
 
         purchase = Purchase.objects.create(
             contact=contact,
             total_amount=total_amount,
-            price_plan=price_plan
         )
 
         service_ids = []
-        for service_data in services_data:
-            service_id = service_data['id']
+        for service in services_data:
+            service_id = service['id']
+            service_obj = Service.objects.get(id=service_id)
+            pricing_plan = service['price_plan']
             service_ids.append(service_id)
-            questions = service_data['questions']
+
+            PurchasedServicePlan.objects.create(
+                purchase=purchase,
+                service=service_obj,
+                price_plan=pricing_plan,
+                plan_name=pricing_plan.name,
+                discount=pricing_plan.discount,
+                base_price=pricing_plan.base_price
+            )
+
+            questions = service['questions']
             for q in questions:
                 try:
                     question_obj = Question.objects.get(id=q['id'])
