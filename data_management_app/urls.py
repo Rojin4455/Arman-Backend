@@ -12,4 +12,5 @@ urlpatterns = [
     path('purchase/', CreatePurchaseView.as_view(), name='create-purchase'),
     path('user/review/<int:id>/', ReviewView.as_view()),
     path('globalsettings/update/', globalsettingsView.as_view()),
+    path('quotes/<int:quoteId>/submit/', FinalSubmition.as_view()),
 ]

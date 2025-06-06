@@ -285,7 +285,7 @@ class PurchasedServicePlan(models.Model):
     # Snapshot of selected PricingOption
     plan_name = models.CharField(max_length=100, null=True, blank=True)
     discount = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    base_price = models.DecimalField(max_digits=10, decimal_places=2,null=True, blank=True)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2,null=True, blank=True)
 
 class QuestionsAndAnswers(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name='answers')

@@ -16,9 +16,9 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from .models import Service, GlobalSettings, Purchase
+from .models import Service, GlobalSettings, Purchase, PurchasedServicePlan
 from .serializers import ServiceSerializer
-from .serializers import PurchaseCreateSerializer, GlobalSettingsSerializer, PurchaseDetailSerializer
+from .serializers import PurchaseCreateSerializer, GlobalSettingsSerializer, PurchaseDetailSerializer, FinalSubmissionSerializer
 from rest_framework.views import APIView
 from .utils import update_contact
 
@@ -179,7 +179,6 @@ class CreatePurchaseView(APIView):
             data = {"customFields": [
                 {
                     "id": "eTxp4zRWHRxg19omqedG", #custom field id
-                    "key": "my_custom_field",   #custom field key
                     "field_value": f'{settings.FRONTEND_URL}/user/review/{purchase.id}/'
                 }
             ]}
@@ -211,3 +210,37 @@ class globalsettingsView(APIView):
             return Response(serializer.data, status=200)
         return Response(serializer.errors, status=400)
     
+class FinalSubmition(APIView):
+    def post(self, request, quoteId):
+        serializer = FinalSubmissionSerializer(data=request.data)
+        if serializer.is_valid():
+            data = serializer.validated_data
+            purchase = Purchase.objects.get(id=data['purchase_id'])
+
+            # Update purchase
+            purchase.is_submited = True
+            purchase.signature = data['signature']
+            purchase.total_amount = data['total_amount']
+            purchase.save()
+
+            # Update each PurchasedServicePlan
+            for service_data in data['services']:
+                try:
+                    purchased_plan = PurchasedServicePlan.objects.get(
+                        purchase=purchase,
+                        service_id=service_data['service_id']
+                    )
+                    price_plan = service_data['price_plan']
+                    purchased_plan.price_plan = price_plan
+                    purchased_plan.plan_name = price_plan.name
+                    purchased_plan.total_amount = price_plan.total_amount
+                    purchased_plan.save()
+                except PurchasedServicePlan.DoesNotExist:
+                    return Response(
+                        {"detail": f"PurchasedServicePlan for service {service_data['service_id']} not found"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            return Response({"detail": "Submission completed successfully."}, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

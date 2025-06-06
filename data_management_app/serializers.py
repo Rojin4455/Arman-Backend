@@ -369,12 +369,13 @@ class PurchasedServicePlanSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         if instance.purchase.is_submited:
             return {
+                'price_plan':data['price_plan'],
                 'plan_name': data['plan_name'],
                 'discount': data['discount'],
-                'base_price': data['base_price'],
+                'total_amount': data['total_amount'],
             }
         else:
-            return {k: v for k, v in data.items() if k not in ['plan_name', 'discount', 'base_price']}
+            return {k: v for k, v in data.items() if k not in ['plan_name', 'discount', 'total_amount']}
 
 class PurchaseDetailSerializer(serializers.ModelSerializer):
     contact = ContactSerializer()
@@ -436,7 +437,7 @@ class PurchaseCreateSerializer(serializers.Serializer):
                 price_plan=pricing_plan,
                 plan_name=pricing_plan.name,
                 discount=pricing_plan.discount,
-                base_price=pricing_plan.base_price
+                total_amount=pricing_plan.base_price
             )
 
             questions = service['questions']
@@ -483,3 +484,23 @@ class GlobalSettingsSerializer(serializers.ModelSerializer):
         instance.minimum_price = data.get('minimum_price')
         instance.save()
         return instance
+    
+class FinalSubmissionServicePlanSerializer(serializers.Serializer):
+    service_id = serializers.IntegerField()
+    price_plan = serializers.PrimaryKeyRelatedField(queryset=PricingOption.objects.all())
+    
+class FinalSubmissionSerializer(serializers.Serializer):
+    purchase_id = serializers.IntegerField()
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    signature = serializers.CharField()
+    services = FinalSubmissionServicePlanSerializer(many=True)
+
+    def validate(self, data):
+        # Optional: check if purchase exists and is not already submitted
+        try:
+            purchase = Purchase.objects.get(id=data['purchase_id'])
+            if purchase.is_submited:
+                raise serializers.ValidationError("Purchase is already submitted.")
+        except Purchase.DoesNotExist:
+            raise serializers.ValidationError("Purchase not found.")
+        return data
