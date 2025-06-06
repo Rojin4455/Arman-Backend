@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db import transaction
 from .models import (
     Service, Feature, PricingOption, PricingOptionFeature, 
-    Question, QuestionOption, Contact, Purchase, GlobalSettings, SavedPricingPlan, QuestionsAndAnswers
+    Question, QuestionOption, Contact, Purchase, GlobalSettings, SavedPricingPlan, QuestionsAndAnswers, QuestionOptionAnswers
 )
 
 class ContactSerializer(serializers.ModelSerializer):
@@ -273,16 +273,27 @@ class ServiceSerializer(serializers.ModelSerializer):
         data['pricingOptions'] = pricing_options
         return data
     
-class QuestionsAndAnswersSerializer(serializers.ModelSerializer):
+class QuestionOptionAnswersSerializer(serializers.ModelSerializer):
     question_option = serializers.SerializerMethodField()
     class Meta:
-        model = QuestionsAndAnswers
-        fields = ['question_option', 'qty', 'ans']
+        model=QuestionOptionAnswers
+        fields=['question_option', 'qty']
+
     def get_question_option(self, instance):
-        if instance.question.type == 'choice':
+        if instance.qu_ans.question.type == 'choice':
             return QuestionOptionSerializer(instance.question_option).data
         return None
 
+    
+class QuestionsAndAnswersSerializer(serializers.ModelSerializer):
+    options = serializers.SerializerMethodField()
+    class Meta:
+        model = QuestionsAndAnswers
+        fields = ['options', 'ans']
+
+    def get_options(self, obj):
+        option_answers = QuestionOptionAnswers.objects.filter(qu_ans=obj)
+        return QuestionOptionAnswersSerializer(option_answers, many=True).data
     
 class QuestionWithAnswerSerializer(serializers.ModelSerializer):
     reactions = serializers.SerializerMethodField()
@@ -373,8 +384,11 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
     
 class QuestionAnswerInputSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    qty = serializers.CharField()
     ans = serializers.BooleanField()
+    options = serializers.DictField(
+        child=serializers.IntegerField(),
+        required=False
+    )
 
 class ServiceWithAnswersInputSerializer(serializers.Serializer):
     id = serializers.IntegerField()
@@ -417,12 +431,24 @@ class PurchaseCreateSerializer(serializers.Serializer):
                             ans=q['ans']
                         )
                     else:
-                        QuestionsAndAnswers.objects.create(
+                        qu_ans = QuestionsAndAnswers.objects.create(
                             purchase=purchase,
                             question=question_obj,
                             ans=q['ans'],
-                            question_option=q['question_option']
                         )
+                        options_data = q.get('options', {})
+                        for key, value in options_data.items():
+                            try:
+                                question_opt_obj = QuestionOption.objects.get(question=question_obj, label__iexact=key)
+                                QuestionOptionAnswers.objects.create(
+                                    qu_ans=qu_ans,
+                                    qty=value,
+                                    question_option=question_opt_obj
+                                )
+                            except QuestionOption.DoesNotExist:
+                                raise serializers.ValidationError(
+                                    f"QuestionOption '{key}' not found for Question ID {question_obj.id}"
+                                )
                 except Question.DoesNotExist:
                     raise serializers.ValidationError(f"Question with id {q['id']} not found")
 
