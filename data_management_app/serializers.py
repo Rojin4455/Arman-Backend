@@ -383,7 +383,7 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Purchase
-        fields = ['id', 'contact', 'services', 'total_amount', 'is_submited']
+        fields = ['id', 'contact', 'services', 'total_amount', 'is_submited', 'signature']
 
     def get_services(self, obj):
         return ServiceWithQuestionsSerializer(
