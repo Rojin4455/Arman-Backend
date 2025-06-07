@@ -233,7 +233,7 @@ class FinalSubmition(APIView):
                     price_plan = service_data['price_plan']
                     purchased_plan.price_plan = price_plan
                     purchased_plan.plan_name = price_plan.name
-                    purchased_plan.total_amount = price_plan.total_amount
+                    purchased_plan.total_amount = service_data['total_amount']
                     purchased_plan.save()
                 except PurchasedServicePlan.DoesNotExist:
                     return Response(

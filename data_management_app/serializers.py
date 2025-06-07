@@ -488,6 +488,7 @@ class GlobalSettingsSerializer(serializers.ModelSerializer):
 class FinalSubmissionServicePlanSerializer(serializers.Serializer):
     service_id = serializers.IntegerField()
     price_plan = serializers.PrimaryKeyRelatedField(queryset=PricingOption.objects.all())
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     
 class FinalSubmissionSerializer(serializers.Serializer):
     purchase_id = serializers.IntegerField()
