@@ -7,7 +7,7 @@ from data_management_app.models import Contact
 from accounts.models import GHLAuthCredentials
 
 
-def fetch_all_contacts(location_id: str) -> List[Dict[str, Any]]:
+def fetch_all_contacts(location_id: str, access_token: str = None) -> List[Dict[str, Any]]:
     """
     Fetch all contacts from GoHighLevel API with proper pagination handling.
     
@@ -18,15 +18,16 @@ def fetch_all_contacts(location_id: str) -> List[Dict[str, Any]]:
     Returns:
         List[Dict]: List of all contacts
     """
-    token = GHLAuthCredentials.objects.get(location_id=location_id)
+
     
     
-    
+    if not access_token:
+        access_token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdXRoQ2xhc3MiOiJMb2NhdGlvbiIsImF1dGhDbGFzc0lkIjoiYjhxdm83Vm9vUDNKRDNkSVpVNDIiLCJzb3VyY2UiOiJJTlRFR1JBVElPTiIsInNvdXJjZUlkIjoiNjgzMWZjYTU0Y2Y5M2VjZjk5NDRmZmJhLW1iMmhpeXowIiwiY2hhbm5lbCI6Ik9BVVRIIiwicHJpbWFyeUF1dGhDbGFzc0lkIjoiYjhxdm83Vm9vUDNKRDNkSVpVNDIiLCJvYXV0aE1ldGEiOnsic2NvcGVzIjpbImNvbnRhY3RzLnJlYWRvbmx5IiwiY29udGFjdHMud3JpdGUiLCJvcHBvcnR1bml0aWVzLnJlYWRvbmx5Iiwib3Bwb3J0dW5pdGllcy53cml0ZSJdLCJjbGllbnQiOiI2ODMxZmNhNTRjZjkzZWNmOTk0NGZmYmEiLCJ2ZXJzaW9uSWQiOiI2ODMxZmNhNTRjZjkzZWNmOTk0NGZmYmEiLCJjbGllbnRLZXkiOiI2ODMxZmNhNTRjZjkzZWNmOTk0NGZmYmEtbWIyaGl5ejAifSwiaWF0IjoxNzQ5NTgxOTI5LjQ5OCwiZXhwIjoxNzQ5NjY4MzI5LjQ5OH0.lqI3Imqb8Myn9olbjesdnyH_k-y5IJvt7lRuw1b7LW7YrYR1b39WC-hi_wSvF_jbSwIVYoUpBJgJ8OjvORfyt4vvlC09Rr6V7bQ1CbJF6ZGNalIudGDMWyF7NcKe95Quns-NSBVanHIKj0HD2_ksTLE9SFM1a4Qnxtjz8bNjMk_l58F7FRCKZFuckuGFOPmSeEdhB_ehgSJu9ZlXQfTxSDMHNPJ65wvd9OyZb_psrUd4UZFf16ev661QVVANYrquVVa4sYIVKp_WsenLzxX29ej9YwJGst7W1uz-DqCHlS2FnzuPHX1Lmb-jtMx35trZ5Z6hYFtvoyOgrqSvP1gf3__HeozEIKxYoptKAaI7Q8T_XzwiWTwgHM8QFxE9OW0iFt27reT9-SPerxMPYpXUh156BShxOKi8xt3G1V2EuysWfN_grU7KvDs-cJLS5kZMnqRzRp-ClcL82-2geQ4szzHStn8uINr1nAU35wB5_sWzvu4e5wYDHoWck6vjQGy2xg_DSF9e61snALI2pSzfara7rTVxLZwxV-I3hxay7l-iigo80m3IViPP19PXHci9vQWWhOJWV_ITPydT-uLwPu2S2Tb6cwLazAX4kRgK4rqJEeqEx3hMuyfuHvKzIx5eqQGiUorP7Nt6QIMN7KgW2NjhqgBn2JVpzgpDWuEOu0Q"  # Your token
     
     base_url = "https://services.leadconnectorhq.com/contacts/"
     headers = {
         "Accept": "application/json",
-        "Authorization": f"Bearer {token.access_token}",
+        "Authorization": f"Bearer {access_token}",
         "Version": "2021-07-28"
     }
     
@@ -163,31 +164,40 @@ def sync_contacts_to_db(contact_data):
 
     for item in contact_data:
         date_added = parse_datetime(item.get("dateAdded")) if item.get("dateAdded") else None
+        
 
-        contact = Contact(
+        contact_obj = Contact(
             contact_id=item.get("id"),
+            first_name=item.get("firstName"),
+            last_name=item.get("lastName"),
+            phone=item.get("phone"),
             email=item.get("email"),
+            dnd=item.get("dnd", False),
             country=item.get("country"),
             date_added=date_added,
             tags=item.get("tags", []),
             custom_fields=item.get("customFields", []),
             location_id=item.get("locationId"),
-            timestamp=date_added,
+            timestamp=date_added
         )
 
         if item.get("id") in existing_ids:
-            # Update existing: fetch and update only fields that may change
+            # Update existing contact
             Contact.objects.filter(contact_id=item["id"]).update(
-                email=contact.email,
-                country=contact.country,
-                date_added=contact.date_added,
-                tags=contact.tags,
-                custom_fields=contact.custom_fields,
-                location_id=contact.location_id,
-                timestamp=contact.timestamp,
+                first_name=contact_obj.first_name,
+                last_name=contact_obj.last_name,
+                phone=contact_obj.phone,
+                email=contact_obj.email,
+                dnd=contact_obj.dnd,
+                country=contact_obj.country,
+                date_added=contact_obj.date_added,
+                tags=contact_obj.tags,
+                custom_fields=contact_obj.custom_fields,
+                location_id=contact_obj.location_id,
+                timestamp=contact_obj.timestamp
             )
         else:
-            contacts_to_create.append(contact)
+            contacts_to_create.append(contact_obj)
 
     if contacts_to_create:
         with transaction.atomic():
