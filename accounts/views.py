@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
+from accounts.utils import fetch_all_contacts
 
 
 CLIENT_ID = settings.CLIENT_ID
@@ -73,6 +74,8 @@ def tokens(request):
 
             }
         )
+
+        fetch_all_contacts(response_data.get("locationId"))
         
         
         
