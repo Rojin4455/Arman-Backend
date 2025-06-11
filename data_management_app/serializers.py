@@ -467,6 +467,16 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
             many=True,
             context={'purchase': obj}
         ).data
+        
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        from data_management_app.models import GlobalSettings  # Adjust if it's in a different app
+        try:
+            settings = GlobalSettings.load()  # `load()` is a standard method for SingletonModel
+            data['minimum_price'] = settings.minimum_price
+        except GlobalSettings.DoesNotExist:
+            data['minimum_price'] = None
+        return data
     
 class QuestionAnswerInputSerializer(serializers.Serializer):
     id = serializers.IntegerField()
