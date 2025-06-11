@@ -277,23 +277,60 @@ class Purchase(models.Model):
     def __str__(self):
         return f"Purchase #{self.id} by Contact {self.contact.contact_id}"
 
-class PurchasedServicePlan(models.Model):
+class PurchasedService(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name="service_plans")
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
-    price_plan = models.ForeignKey(PricingOption, on_delete=models.CASCADE, related_name='purchases')
+    price_plan = models.ForeignKey(PricingOption, on_delete=models.SET_NULL, related_name='purchases', null=True)
 
-    # Snapshot of selected PricingOption
-    plan_name = models.CharField(max_length=100, null=True, blank=True)
+    # Snapshot of selected Service
+    service_name = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+
+    selected_plan = models.ForeignKey('data_management_app.PurchasedServicePlan', on_delete=models.CASCADE, related_name='selected_service', null=True)
+
+    # # Snapshot of selected PricingOption
+    # plan_name = models.CharField(max_length=100, null=True, blank=True)
+    # discount = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    # total_amount = models.DecimalField(max_digits=10, decimal_places=2,null=True, blank=True)
+
+class PurchasedServicePlan(models.Model):
+    purchased_service = models.ForeignKey(PurchasedService, on_delete=models.CASCADE, null=True, related_name="service_feature_plans")
+
+    name = models.CharField(max_length=100, null=True, blank=True)
     discount = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2,null=True, blank=True)
+    
+class PurChasedServiceFeature(models.Model):
+    purchased_service = models.ForeignKey(PurchasedService, on_delete=models.CASCADE, related_name="service_feature")
+
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+
+class PlanFeature(models.Model):
+    purchased_service_plan = models.ForeignKey(PurchasedServicePlan, on_delete=models.CASCADE, related_name="plan_feat")
+    feature = models.ForeignKey(PurChasedServiceFeature, on_delete=models.CASCADE, related_name='plan_feat')
+    is_included = models.BooleanField(default=False)
 
 class QuestionsAndAnswers(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name='answers')
-    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='questionsandanswers')
-    ans = models.BooleanField(default=False)
+    purchased_service = models.ForeignKey(PurchasedService, on_delete=models.CASCADE, related_name='answers', null=True, blank=True)
+    question = models.ForeignKey(Question, on_delete=models.SET_NULL,null=True, related_name='questionsandanswers')
+
+    question_name = models.CharField(max_length=500)
+    question_type = models.CharField(max_length=200)
+    unit_price = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        validators=[MinValueValidator(0)],
+        default=0,
+        help_text="Additional price per unit for this question"
+    )
+    bool_ans = models.BooleanField(default=False)
 
 class QuestionOptionAnswers(models.Model):
     qu_ans = models.ForeignKey(QuestionsAndAnswers, on_delete=models.CASCADE)
-    question_option = models.ForeignKey(QuestionOption, on_delete=models.CASCADE, related_name='answers', null=True, blank=True)
+    question_option = models.ForeignKey(QuestionOption, on_delete=models.SET_NULL, related_name='answers', null=True, blank=True)
+
+    value = models.CharField(max_length=200)
+    label = models.CharField(max_length=200, blank=True)
     qty = models.CharField(max_length=200, null=True, blank=True)
     

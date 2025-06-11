@@ -2,7 +2,8 @@ from rest_framework import serializers
 from django.db import transaction
 from .models import (
     Service, Feature, PricingOption, PricingOptionFeature, 
-    Question, QuestionOption, Contact, Purchase, GlobalSettings, PurchasedServicePlan, QuestionsAndAnswers, QuestionOptionAnswers
+    Question, QuestionOption, Contact, Purchase, GlobalSettings, PurchasedService, QuestionsAndAnswers, QuestionOptionAnswers,PurChasedServiceFeature,
+    PurchasedServicePlan, PlanFeature
 )
 
 class ContactSerializer(serializers.ModelSerializer):
@@ -271,16 +272,21 @@ class ServiceSerializer(serializers.ModelSerializer):
             pricing_options.append(po_data)
         
         data['pricingOptions'] = pricing_options
+        from data_management_app.models import GlobalSettings  # Adjust if it's in a different app
+        try:
+            settings = GlobalSettings.load()  # `load()` is a standard method for SingletonModel
+            data['minimum_price'] = settings.minimum_price
+        except GlobalSettings.DoesNotExist:
+            data['minimum_price'] = None
         return data
     
 class QuestionOptionAnswersSerializer(serializers.ModelSerializer):
-    question_option = serializers.SerializerMethodField()
     class Meta:
         model=QuestionOptionAnswers
-        fields=['question_option', 'qty']
+        fields=['qty', 'value', 'label']
 
     def get_question_option(self, instance):
-        if instance.qu_ans.question.type == 'choice':
+        if instance.qu_ans.question_type == 'choice':
             return QuestionOptionSerializer(instance.question_option).data
         return None
 
@@ -289,11 +295,17 @@ class QuestionsAndAnswersSerializer(serializers.ModelSerializer):
     options = serializers.SerializerMethodField()
     class Meta:
         model = QuestionsAndAnswers
-        fields = ['options', 'ans']
+        fields = ['options', 'bool_ans', 'question_name', 'question_type', 'unit_price']
 
     def get_options(self, obj):
         option_answers = QuestionOptionAnswers.objects.filter(qu_ans=obj)
         return QuestionOptionAnswersSerializer(option_answers, many=True).data
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['type']=data['question_type']
+        data['text']=data['question_name']
+        return data
     
 class QuestionWithAnswerSerializer(serializers.ModelSerializer):
     reactions = serializers.SerializerMethodField()
@@ -313,6 +325,11 @@ class QuestionWithAnswerSerializer(serializers.ModelSerializer):
             return QuestionsAndAnswersSerializer(answer, many=True).data
         except QuestionsAndAnswers.DoesNotExist:
             return None
+        
+class PurChasedServiceFeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PurChasedServiceFeature
+        fields = '__all__'
     
 class ServiceWithQuestionsSerializer(serializers.ModelSerializer):
     features = FeatureSerializer(many=True, required=False)
@@ -328,12 +345,18 @@ class ServiceWithQuestionsSerializer(serializers.ModelSerializer):
     def get_questions(self, obj):
         purchase = self.context.get('purchase')
         questions = obj.questions.all()
-        return QuestionWithAnswerSerializer(questions, many=True, context={'purchase': purchase}).data
+        q_ans=QuestionsAndAnswers.objects.filter(purchase=purchase)
+        return QuestionsAndAnswersSerializer(q_ans, many=True).data
     
     def get_price_plan(self, instance):
         purchase = self.context.get('purchase')
-        spp = PurchasedServicePlan.objects.filter(purchase=purchase, service=instance).first()
-        return PurchasedServicePlanSerializer(spp).data
+        print(purchase, 'll')
+        spp = PurchasedService.objects.filter(purchase=purchase, service=instance).first()
+        print(spp, 'ddd')
+        if purchase.is_submited:
+            pricing_options = PurChasedServiceFeatureSerializer(spp.service_feature.all(), many=True).data
+            print(pricing_options, 'priiggg')
+        return PurchasedServiceSerializer(spp).data
     
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -355,27 +378,80 @@ class ServiceWithQuestionsSerializer(serializers.ModelSerializer):
                     'is_included': pof.is_included
                 })
             pricing_options.append(po_data)
-        
+          
         data['pricingOptions'] = pricing_options
         return data
-
-
+    
 class PurchasedServicePlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchasedServicePlan
-        exclude = ['purchase', 'service', 'id']
+        fields = '__all__'
+
+class PlanFeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlanFeature
+        fields = '__all__'
+
+
+class PurchasedServiceSerializer(serializers.ModelSerializer):
+    features = serializers.SerializerMethodField()
+    pricingOptions = serializers.SerializerMethodField()
+    price_plan = serializers.SerializerMethodField()
+    questions = serializers.SerializerMethodField()
+    class Meta:
+        model = PurchasedService
+        exclude = ['purchase', 'service']
+
+    def get_features(self, obj):
+        if not obj.selected_plan:
+            return []
+
+        # Get related PlanFeatures
+        features = obj.selected_plan.plan_feat.select_related('feature')
+
+        return [
+            {
+                'id': pf.feature.id,
+                'name': pf.feature.name,
+                'description': pf.feature.description,
+            }
+            for pf in features
+        ]
+
+    def get_questions(self, obj):
+        purchase = self.context.get('purchase')
+        q_ans=QuestionsAndAnswers.objects.filter(purchase=purchase, purchased_service=obj)
+        return QuestionsAndAnswersSerializer(q_ans, many=True).data
+    
+    def get_pricingOptions(self, instance):
+        return PurChasedServiceFeatureSerializer(instance.service_feature.all(), many=True).data
+    
+    def get_price_plan(self, instance):
+        return PurchasedServicePlanSerializer(instance.service_feature_plans.all(), many=True).data
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        if instance.purchase.is_submited:
-            return {
-                'price_plan':data['price_plan'],
-                'plan_name': data['plan_name'],
-                'discount': data['discount'],
-                'total_amount': data['total_amount'],
+        pricing_options = []
+        for po in instance.service_feature_plans.all():
+            po_data = {
+                'id': po.id,
+                'name': po.name,
+                'discount': po.discount,
+                'selectedFeatures': []
             }
-        else:
-            return {k: v for k, v in data.items() if k not in ['plan_name', 'discount', 'total_amount']}
+            # Add selected features
+            for pof in po.plan_feat.all():
+                po_data['selectedFeatures'].append({
+                    'id': pof.feature.id,
+                    'name':pof.feature.name,
+                    'is_included': pof.is_included
+                })
+            pricing_options.append(po_data)
+          
+        data['pricingOptions'] = pricing_options
+        data['name'] = data['service_name']
+        data['price_plan'] = data['selected_plan']
+        return data
 
 class PurchaseDetailSerializer(serializers.ModelSerializer):
     contact = ContactSerializer()
@@ -386,8 +462,8 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
         fields = ['id', 'contact', 'services', 'total_amount', 'is_submited', 'signature']
 
     def get_services(self, obj):
-        return ServiceWithQuestionsSerializer(
-            obj.services.all(),
+        return PurchasedServiceSerializer(
+            obj.service_plans.all(),
             many=True,
             context={'purchase': obj}
         ).data
@@ -431,14 +507,38 @@ class PurchaseCreateSerializer(serializers.Serializer):
             pricing_plan = service['price_plan']
             service_ids.append(service_id)
 
-            PurchasedServicePlan.objects.create(
+            purchased_service_obj=PurchasedService.objects.create(
                 purchase=purchase,
                 service=service_obj,
                 price_plan=pricing_plan,
-                plan_name=pricing_plan.name,
-                discount=pricing_plan.discount,
-                total_amount=pricing_plan.base_price
+                service_name=service_obj.name,
+                description=service_obj.description
+                # plan_name=pricing_plan.name,
+                # discount=pricing_plan.discount,
+                # total_amount=pricing_plan.base_price
             )
+
+            print(pricing_plan, 'pricinggggddd')
+
+            # pricing_plan_obj = PricingOption.objects.get(id=pricing_plan.id)
+            pricing_options = PricingOption.objects.filter(service=service_obj)
+            selected_plan = None
+            for option in pricing_options:
+                print(option, 'optionn')
+                purchased_pricing_plan_obj = PurchasedServicePlan.objects.create(purchased_service=purchased_service_obj, name=option.name, discount=option.discount)
+                features = pricing_plan.selected_features.all()
+                for feat in features:
+                    p_feat_obj=PurChasedServiceFeature.objects.create(purchased_service=purchased_service_obj, name=feat.feature.name, description=feat.feature.description)
+
+                    PlanFeature.objects.create(purchased_service_plan=purchased_pricing_plan_obj, feature=p_feat_obj, is_included=feat.is_included)     
+                if option == pricing_plan:
+                    print('selected', option)
+                    selected_plan = purchased_pricing_plan_obj
+            
+            purchased_service_obj.selected_plan = selected_plan
+            purchased_service_obj.save()
+
+
 
             questions = service['questions']
             for q in questions:
@@ -447,14 +547,22 @@ class PurchaseCreateSerializer(serializers.Serializer):
                     if question_obj.type=='boolean':
                         QuestionsAndAnswers.objects.create(
                             purchase=purchase,
+                            purchased_service=purchased_service_obj,
                             question=question_obj,
-                            ans=q['ans']
+                            bool_ans=q['ans'],
+                            question_name=question_obj.text,
+                            question_type=question_obj.type,
+                            unit_price=question_obj.unit_price
                         )
                     else:
                         qu_ans = QuestionsAndAnswers.objects.create(
                             purchase=purchase,
+                            purchased_service=purchased_service_obj,
                             question=question_obj,
-                            ans=q['ans'],
+                            bool_ans=q['ans'],
+                            question_name=question_obj.text,
+                            question_type=question_obj.type,
+                            unit_price=question_obj.unit_price
                         )
                         options_data = q.get('options', {})
                         for key, value in options_data.items():
@@ -463,6 +571,8 @@ class PurchaseCreateSerializer(serializers.Serializer):
                                 QuestionOptionAnswers.objects.create(
                                     qu_ans=qu_ans,
                                     qty=value,
+                                    label=question_opt_obj.label,
+                                    value=question_opt_obj.value,
                                     question_option=question_opt_obj
                                 )
                             except QuestionOption.DoesNotExist:
@@ -487,7 +597,7 @@ class GlobalSettingsSerializer(serializers.ModelSerializer):
     
 class FinalSubmissionServicePlanSerializer(serializers.Serializer):
     service_id = serializers.IntegerField()
-    price_plan = serializers.PrimaryKeyRelatedField(queryset=PricingOption.objects.all())
+    price_plan = serializers.PrimaryKeyRelatedField(queryset=PurchasedServicePlan.objects.all())
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     
 class FinalSubmissionSerializer(serializers.Serializer):

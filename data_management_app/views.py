@@ -16,11 +16,12 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from .models import Service, GlobalSettings, Purchase, PurchasedServicePlan
+from .models import Service, GlobalSettings, Purchase, PurchasedService, Feature, PurChasedServiceFeature, PricingOptionFeature
 from .serializers import ServiceSerializer
 from .serializers import PurchaseCreateSerializer, GlobalSettingsSerializer, PurchaseDetailSerializer, FinalSubmissionSerializer
 from rest_framework.views import APIView
-from .utils import update_contact
+from .utils import update_contact, add_tags
+from accounts.models import GHLAuthCredentials
 
 
 
@@ -212,6 +213,9 @@ class globalsettingsView(APIView):
     
 class FinalSubmition(APIView):
     def post(self, request, quoteId):
+        purchase_id = request.data.get('purchase_id')
+        purchase=Purchase.objects.get(id=purchase_id)
+        contact_id = purchase.contact.contact_id
         serializer = FinalSubmissionSerializer(data=request.data)
         if serializer.is_valid():
             data = serializer.validated_data
@@ -226,21 +230,34 @@ class FinalSubmition(APIView):
             # Update each PurchasedServicePlan
             for service_data in data['services']:
                 try:
-                    purchased_plan = PurchasedServicePlan.objects.get(
-                        purchase=purchase,
-                        service_id=service_data['service_id']
+                    purchased_plan = PurchasedService.objects.get(
+                        id=service_data['service_id']
                     )
                     price_plan = service_data['price_plan']
-                    purchased_plan.price_plan = price_plan
-                    purchased_plan.plan_name = price_plan.name
-                    purchased_plan.total_amount = service_data['total_amount']
+                    purchased_plan.selected_plan = price_plan
                     purchased_plan.save()
-                except PurchasedServicePlan.DoesNotExist:
+                    
+
+                except PurchasedService.DoesNotExist:
                     return Response(
                         {"detail": f"PurchasedServicePlan for service {service_data['service_id']} not found"},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-
-            return Response({"detail": "Submission completed successfully."}, status=status.HTTP_200_OK)
+            if add_tags(contact_id):
+                return Response({"detail": "Submission completed successfully."}, status=status.HTTP_200_OK)
+            return Response({'error':'Error at adding tags in GHL.'},status=400)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class validate_locationId(APIView):
+    def get(self, request):
+        location_id = request.data.get('location_id')
+        if not location_id:
+            return Response({'error':'locationId not found'}, status=401)
+        
+        credentials = GHLAuthCredentials.objects.first()
+        
+        if location_id != credentials.location_id:
+            return Response({'error':'Unauthenticated locationId'}, status=401)
+        
+        return Response({'status':True},status=200)

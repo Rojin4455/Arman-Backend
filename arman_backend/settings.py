@@ -134,6 +134,7 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+print("⚠️ Using DB host:", DATABASES['default']['HOST'])
 
 
 # Password validation

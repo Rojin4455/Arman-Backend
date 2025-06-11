@@ -13,4 +13,5 @@ urlpatterns = [
     path('user/review/<int:id>/', ReviewView.as_view()),
     path('globalsettings/update/', globalsettingsView.as_view()),
     path('quotes/<int:quoteId>/submit/', FinalSubmition.as_view()),
+    path('validate/location/', validate_locationId.as_view()),
 ]
