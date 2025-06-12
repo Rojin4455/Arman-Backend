@@ -154,60 +154,46 @@ def fetch_all_contacts(location_id: str, access_token: str = None) -> List[Dict[
 
 def sync_contacts_to_db(contact_data):
     """
-    Syncs contact data from API into the local Contact model using bulk upsert.
+    Syncs contact data from API into the local Contact model using manual update or create logic.
     
     Args:
         contact_data (list): List of contact dicts from GoHighLevel API
     """
-    contacts_to_create = []
-    existing_ids = set(Contact.objects.filter(contact_id__in=[c['id'] for c in contact_data]).values_list('contact_id', flat=True))
+    created_count = 0
+    updated_count = 0
 
     for item in contact_data:
-        
-        
-        
+        contact_id = item.get("id")
         date_added = parse_datetime(item.get("dateAdded")) if item.get("dateAdded") else None
-        
 
-        contact_obj = Contact(
-            contact_id=item.get("id"),
-            first_name=item.get("firstName"),
-            last_name=item.get("lastName"),
-            phone=item.get("phone"),
-            email=item.get("email"),
-            dnd=item.get("dnd", False),
-            country=item.get("country"),
-            date_added=date_added,
-            tags=item.get("tags", []),
-            custom_fields=item.get("customFields", []),
-            location_id=item.get("locationId"),
-            timestamp=date_added
+        defaults = {
+            "first_name": item.get("firstName"),
+            "last_name": item.get("lastName"),
+            "phone": item.get("phone"),
+            "email": item.get("email"),
+            "dnd": item.get("dnd", False),
+            "country": item.get("country"),
+            "date_added": date_added,
+            "tags": item.get("tags", []),
+            "custom_fields": item.get("customFields", []),
+            "location_id": item.get("locationId"),
+            "timestamp": date_added,
+        }
+
+        obj, created = Contact.objects.update_or_create(
+            contact_id=contact_id,
+            defaults=defaults
         )
 
-        if item.get("id") in existing_ids:
-            # Update existing contact
-            Contact.objects.filter(contact_id=item["id"]).update(
-                first_name=contact_obj.first_name,
-                last_name=contact_obj.last_name,
-                phone=contact_obj.phone,
-                email=contact_obj.email,
-                dnd=contact_obj.dnd,
-                country=contact_obj.country,
-                date_added=contact_obj.date_added,
-                tags=contact_obj.tags,
-                custom_fields=contact_obj.custom_fields,
-                location_id=contact_obj.location_id,
-                timestamp=contact_obj.timestamp
-            )
+        if created:
+            created_count += 1
+            print(f"Created: {obj}")
         else:
-            contacts_to_create.append(contact_obj)
+            updated_count += 1
+            print(f"Updated: {obj}")
 
-    if contacts_to_create:
-        with transaction.atomic():
-            Contact.objects.bulk_create(contacts_to_create, ignore_conflicts=True)
-
-    print(f"{len(contacts_to_create)} new contacts created.")
-    print(f"{len(existing_ids)} existing contacts updated.")
+    print(f"{created_count} contacts created.")
+    print(f"{updated_count} contacts updated.")
 
 
 
