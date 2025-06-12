@@ -20,7 +20,7 @@ from .models import Service, GlobalSettings, Purchase, PurchasedService, Feature
 from .serializers import ServiceSerializer
 from .serializers import PurchaseCreateSerializer, GlobalSettingsSerializer, PurchaseDetailSerializer, FinalSubmissionSerializer
 from rest_framework.views import APIView
-from .utils import update_contact, add_tags
+from .utils import update_contact, add_tags, add_custom_field
 from accounts.models import GHLAuthCredentials
 
 
@@ -179,7 +179,7 @@ class CreatePurchaseView(APIView):
             purchase = serializer.save()
             data = {"customFields": [
                 {
-                    "id": "eTxp4zRWHRxg19omqedG", #custom field id
+                    "id": "Bff2eZtlr82uvVQmByPh", #custom field id
                     "field_value": f'{settings.FRONTEND_URL}/user/review/{purchase.id}/'
                 }
             ]}
@@ -244,8 +244,14 @@ class FinalSubmition(APIView):
                         status=status.HTTP_400_BAD_REQUEST
                     )
             if add_tags(contact_id):
+                data = {"customFields": [
+                    {
+                        "id": "AfQbphMXdk6rk6vnWPPU", #custom field id
+                        "field_value": float(purchase.total_amount)
+                    }
+                ]}
+                res = update_contact(contact_id, data)
                 return Response({"detail": "Submission completed successfully."}, status=status.HTTP_200_OK)
-            return Response({'error':'Error at adding tags in GHL.'},status=400)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     

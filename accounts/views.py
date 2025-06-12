@@ -75,7 +75,7 @@ def tokens(request):
             }
         )
 
-        fetch_all_contacts(response_data.get("locationId"))
+        fetch_all_contacts(response_data.get("locationId"), response_data.get("access_token"))
         
         
         
