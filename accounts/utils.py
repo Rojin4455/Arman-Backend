@@ -19,8 +19,7 @@ def fetch_all_contacts(location_id: str, access_token: str = None) -> List[Dict[
         List[Dict]: List of all contacts
     """
 
-    if not access_token:
-        access_token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdXRoQ2xhc3MiOiJMb2NhdGlvbiIsImF1dGhDbGFzc0lkIjoiYjhxdm83Vm9vUDNKRDNkSVpVNDIiLCJzb3VyY2UiOiJJTlRFR1JBVElPTiIsInNvdXJjZUlkIjoiNjgzMWZjYTU0Y2Y5M2VjZjk5NDRmZmJhLW1iMmhpeXowIiwiY2hhbm5lbCI6Ik9BVVRIIiwicHJpbWFyeUF1dGhDbGFzc0lkIjoiYjhxdm83Vm9vUDNKRDNkSVpVNDIiLCJvYXV0aE1ldGEiOnsic2NvcGVzIjpbImNvbnRhY3RzLnJlYWRvbmx5IiwiY29udGFjdHMud3JpdGUiLCJvcHBvcnR1bml0aWVzLnJlYWRvbmx5Iiwib3Bwb3J0dW5pdGllcy53cml0ZSIsImxvY2F0aW9ucy9jdXN0b21GaWVsZHMucmVhZG9ubHkiLCJsb2NhdGlvbnMvY3VzdG9tVmFsdWVzLndyaXRlIiwibG9jYXRpb25zL2N1c3RvbVZhbHVlcy5yZWFkb25seSIsImxvY2F0aW9ucy9jdXN0b21GaWVsZHMud3JpdGUiXSwiY2xpZW50IjoiNjgzMWZjYTU0Y2Y5M2VjZjk5NDRmZmJhIiwidmVyc2lvbklkIjoiNjgzMWZjYTU0Y2Y5M2VjZjk5NDRmZmJhIiwiY2xpZW50S2V5IjoiNjgzMWZjYTU0Y2Y5M2VjZjk5NDRmZmJhLW1iMmhpeXowIn0sImlhdCI6MTc0OTcyMzM4Ni4yNTMsImV4cCI6MTc0OTgwOTc4Ni4yNTN9.oVTgX3nYZqejoADncgyh3pinL7bPZkH0iJKsij4YXfEVh2KsDK_jJ7_xr1eZLcC7Up7nM9WFcz0inj05gzfat7pGSNPe1ULSYkf9FBWE6AAW6HdY_etXYWb3pf5Gxo9ovAhy5fzcY-dm_YzswqnEBQiYTNL8Wr4eECHEHJYvvQwVNv8jzTWzGE2FmPih1sdhRqLB0oEUtNBKQY2IH2Z5A8j3QGqH3ZH52xUolaSsrdsY7WjKPKs5EOqfOQuAtGYC35xNTHKeC-5bZIACEUhLg6GmO20k2vZOjaMJACDe-cnXAHEVYAfmESvMwEQdjEjupTQ1L0fs0D85_DVUWMhbAnQGJdtFGJL05zeqtNdLHpXHl678pIwYnXCBS9QM8NjGZwSG5NgnVglaYHEaqj8LFAMWHHYX1AW-KUcOZgp8J_zwZrDZ5sTuFMWZbAjCnVdsjWfq5eVb7aeSqbkMXWnJDe0R7zbdhM1H5kucfohzN9iKyJouibJJzWUYWGYDFiQ02wxcKxWOlpYNctSprr-cSxVbAIfonkxnOrfX6c-LXeZ2j4NpHfHKyKZ0WooFAYAtT-D1r7taX0MSAfKC-A_345sQAI-aDA0cppzv9N7_kp-nY5OVh5u2lI-MqejN7lstaZUOdBz5Dioy7qLW-G5k4lSpKzriharuR17D0sk5OnA"
+    
     
     
     
@@ -154,46 +153,59 @@ def fetch_all_contacts(location_id: str, access_token: str = None) -> List[Dict[
 
 def sync_contacts_to_db(contact_data):
     """
-    Syncs contact data from API into the local Contact model using manual update or create logic.
+    Syncs contact data from API into the local Contact model using bulk upsert.
     
     Args:
         contact_data (list): List of contact dicts from GoHighLevel API
     """
-    created_count = 0
-    updated_count = 0
+    contacts_to_create = []
+    existing_ids = set(Contact.objects.filter(contact_id__in=[c['id'] for c in contact_data]).values_list('contact_id', flat=True))
 
     for item in contact_data:
-        contact_id = item.get("id")
+        print("Itemmmmm:", item)
+        break
         date_added = parse_datetime(item.get("dateAdded")) if item.get("dateAdded") else None
+        
 
-        defaults = {
-            "first_name": item.get("firstName"),
-            "last_name": item.get("lastName"),
-            "phone": item.get("phone"),
-            "email": item.get("email"),
-            "dnd": item.get("dnd", False),
-            "country": item.get("country"),
-            "date_added": date_added,
-            "tags": item.get("tags", []),
-            "custom_fields": item.get("customFields", []),
-            "location_id": item.get("locationId"),
-            "timestamp": date_added,
-        }
-
-        obj, created = Contact.objects.update_or_create(
-            contact_id=contact_id,
-            defaults=defaults
+        contact_obj = Contact(
+            contact_id=item.get("id"),
+            first_name=item.get("firstName"),
+            last_name=item.get("lastName"),
+            phone=item.get("phone"),
+            email=item.get("email"),
+            dnd=item.get("dnd", False),
+            country=item.get("country"),
+            date_added=date_added,
+            tags=item.get("tags", []),
+            custom_fields=item.get("customFields", []),
+            location_id=item.get("locationId"),
+            timestamp=date_added
         )
 
-        if created:
-            created_count += 1
-            print(f"Created: {obj}")
+        if item.get("id") in existing_ids:
+            # Update existing contact
+            Contact.objects.filter(contact_id=item["id"]).update(
+                first_name=contact_obj.first_name,
+                last_name=contact_obj.last_name,
+                phone=contact_obj.phone,
+                email=contact_obj.email,
+                dnd=contact_obj.dnd,
+                country=contact_obj.country,
+                date_added=contact_obj.date_added,
+                tags=contact_obj.tags,
+                custom_fields=contact_obj.custom_fields,
+                location_id=contact_obj.location_id,
+                timestamp=contact_obj.timestamp
+            )
         else:
-            updated_count += 1
-            print(f"Updated: {obj}")
+            contacts_to_create.append(contact_obj)
 
-    print(f"{created_count} contacts created.")
-    print(f"{updated_count} contacts updated.")
+    if contacts_to_create:
+        with transaction.atomic():
+            Contact.objects.bulk_create(contacts_to_create, ignore_conflicts=True)
+
+    print(f"{len(contacts_to_create)} new contacts created.")
+    print(f"{len(existing_ids)} existing contacts updated.")
 
 
 
