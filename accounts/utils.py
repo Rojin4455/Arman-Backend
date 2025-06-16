@@ -162,8 +162,7 @@ def sync_contacts_to_db(contact_data):
     existing_ids = set(Contact.objects.filter(contact_id__in=[c['id'] for c in contact_data]).values_list('contact_id', flat=True))
 
     for item in contact_data:
-        print("Itemmmmm:", item)
-        break
+        
         date_added = parse_datetime(item.get("dateAdded")) if item.get("dateAdded") else None
         
 
