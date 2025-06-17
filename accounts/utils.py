@@ -21,8 +21,7 @@ def fetch_all_contacts(location_id: str, access_token: str = None) -> List[Dict[
 
     
     
-    if not access_token:
-        access_token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdXRoQ2xhc3MiOiJMb2NhdGlvbiIsImF1dGhDbGFzc0lkIjoiYjhxdm83Vm9vUDNKRDNkSVpVNDIiLCJzb3VyY2UiOiJJTlRFR1JBVElPTiIsInNvdXJjZUlkIjoiNjgzMWZjYTU0Y2Y5M2VjZjk5NDRmZmJhLW1iMmhpeXowIiwiY2hhbm5lbCI6Ik9BVVRIIiwicHJpbWFyeUF1dGhDbGFzc0lkIjoiYjhxdm83Vm9vUDNKRDNkSVpVNDIiLCJvYXV0aE1ldGEiOnsic2NvcGVzIjpbImNvbnRhY3RzLnJlYWRvbmx5IiwiY29udGFjdHMud3JpdGUiLCJvcHBvcnR1bml0aWVzLnJlYWRvbmx5Iiwib3Bwb3J0dW5pdGllcy53cml0ZSJdLCJjbGllbnQiOiI2ODMxZmNhNTRjZjkzZWNmOTk0NGZmYmEiLCJ2ZXJzaW9uSWQiOiI2ODMxZmNhNTRjZjkzZWNmOTk0NGZmYmEiLCJjbGllbnRLZXkiOiI2ODMxZmNhNTRjZjkzZWNmOTk0NGZmYmEtbWIyaGl5ejAifSwiaWF0IjoxNzQ5NTgxOTI5LjQ5OCwiZXhwIjoxNzQ5NjY4MzI5LjQ5OH0.lqI3Imqb8Myn9olbjesdnyH_k-y5IJvt7lRuw1b7LW7YrYR1b39WC-hi_wSvF_jbSwIVYoUpBJgJ8OjvORfyt4vvlC09Rr6V7bQ1CbJF6ZGNalIudGDMWyF7NcKe95Quns-NSBVanHIKj0HD2_ksTLE9SFM1a4Qnxtjz8bNjMk_l58F7FRCKZFuckuGFOPmSeEdhB_ehgSJu9ZlXQfTxSDMHNPJ65wvd9OyZb_psrUd4UZFf16ev661QVVANYrquVVa4sYIVKp_WsenLzxX29ej9YwJGst7W1uz-DqCHlS2FnzuPHX1Lmb-jtMx35trZ5Z6hYFtvoyOgrqSvP1gf3__HeozEIKxYoptKAaI7Q8T_XzwiWTwgHM8QFxE9OW0iFt27reT9-SPerxMPYpXUh156BShxOKi8xt3G1V2EuysWfN_grU7KvDs-cJLS5kZMnqRzRp-ClcL82-2geQ4szzHStn8uINr1nAU35wB5_sWzvu4e5wYDHoWck6vjQGy2xg_DSF9e61snALI2pSzfara7rTVxLZwxV-I3hxay7l-iigo80m3IViPP19PXHci9vQWWhOJWV_ITPydT-uLwPu2S2Tb6cwLazAX4kRgK4rqJEeqEx3hMuyfuHvKzIx5eqQGiUorP7Nt6QIMN7KgW2NjhqgBn2JVpzgpDWuEOu0Q"  # Your token
+    
     
     base_url = "https://services.leadconnectorhq.com/contacts/"
     headers = {
@@ -163,6 +162,7 @@ def sync_contacts_to_db(contact_data):
     existing_ids = set(Contact.objects.filter(contact_id__in=[c['id'] for c in contact_data]).values_list('contact_id', flat=True))
 
     for item in contact_data:
+        
         date_added = parse_datetime(item.get("dateAdded")) if item.get("dateAdded") else None
         
 

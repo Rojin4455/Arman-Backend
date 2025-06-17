@@ -48,16 +48,21 @@ class ContactSearchView(ListAPIView):
     pagination_class = ContactPagination
 
     def get_queryset(self):
-        query = self.request.query_params.get('search', '')
+        query = self.request.query_params.get('search', '').strip()
+        qs = Contact.objects.all()
+
         if query:
-            return Contact.objects.filter(
-                Q(first_name__icontains=query) |
-                Q(last_name__icontains=query) |
-                Q(email__icontains=query) |
-                Q(phone__icontains=query) |
-                Q(country__icontains=query)
-            ).order_by('-date_added')
-        return Contact.objects.all().order_by('-date_added')
+            keywords = query.split()
+            q_object = Q()
+            for keyword in keywords:
+                q_object |= Q(first_name__icontains=keyword)
+                q_object |= Q(last_name__icontains=keyword)
+                q_object |= Q(email__icontains=keyword)
+                q_object |= Q(phone__icontains=keyword)
+                q_object |= Q(country__icontains=keyword)
+            qs = qs.filter(q_object)
+
+        return qs.order_by('-date_added')
 
 
 
