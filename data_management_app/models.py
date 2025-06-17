@@ -189,6 +189,7 @@ class Question(models.Model):
         ('multiple_choice', 'Multiple Selection'),
         ('date', 'Date'),
         ('email', 'Email'),
+        ('extra_choice', 'Extra Choice')
     ]
 
  
@@ -241,11 +242,10 @@ class QuestionOption(models.Model):
 
     class Meta:
         ordering = ['question', 'order']
-        unique_together = ['question', 'value']
 
     def clean(self):
         """Ensure question type supports options"""
-        if self.question.type not in ['choice', 'multiple_choice']:
+        if self.question.type not in ['choice', 'multiple_choice', 'extra_choice']:
             raise ValidationError(
                 "Options can only be added to choice or multiple_choice questions"
             )

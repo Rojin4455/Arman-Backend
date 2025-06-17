@@ -39,7 +39,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         # Include options in response
-        if instance.type in ['choice', 'multiple_choice']:
+        if instance.type in ['choice', 'multiple_choice', 'extra_choice']:
             print("instance type: ",instance.options.all())
             data['options'] = [{opt.label:opt.value} for opt in instance.options.all()]
         return data
