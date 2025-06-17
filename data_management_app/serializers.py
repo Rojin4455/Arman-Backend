@@ -564,6 +564,30 @@ class PurchaseCreateSerializer(serializers.Serializer):
                             question_type=question_obj.type,
                             unit_price=question_obj.unit_price
                         )
+                    elif question_obj.type=='extra_choice':
+                        qu_ans = QuestionsAndAnswers.objects.create(
+                            purchase=purchase,
+                            purchased_service=purchased_service_obj,
+                            question=question_obj,
+                            bool_ans=q['ans'],
+                            question_name=question_obj.text,
+                            question_type=question_obj.type,
+                            unit_price=question_obj.unit_price
+                        )
+                        options_data = q.get('options', {})
+                        for key, value in options_data.items():
+                            try:
+                                question_opt_obj = QuestionOption.objects.get(question=question_obj, label__iexact=key)
+                                QuestionOptionAnswers.objects.create(
+                                    qu_ans=qu_ans,
+                                    label=question_opt_obj.label,
+                                    value=question_opt_obj.value,
+                                    question_option=question_opt_obj
+                                )
+                            except QuestionOption.DoesNotExist:
+                                raise serializers.ValidationError(
+                                    f"QuestionOption '{key}' not found for Question ID {question_obj.id}"
+                                )
                     else:
                         qu_ans = QuestionsAndAnswers.objects.create(
                             purchase=purchase,
