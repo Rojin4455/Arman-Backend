@@ -400,7 +400,7 @@ class PurchasedServiceSerializer(serializers.ModelSerializer):
     questions = serializers.SerializerMethodField()
     class Meta:
         model = PurchasedService
-        exclude = ['purchase', 'service']
+        exclude = ['purchase']
 
     def get_features(self, obj):
         if not obj.selected_plan:
