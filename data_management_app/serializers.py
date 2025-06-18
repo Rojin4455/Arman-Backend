@@ -507,7 +507,7 @@ class PurchaseCreateSerializer(serializers.Serializer):
         queryset=Contact.objects.all()
     )
     services = ServiceWithAnswersInputSerializer(many=True)
-    custom_product = CustomProductSerializer(many=True, required=False)
+    custom_products = CustomProductSerializer(many=True, required=False)
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     is_submited = serializers.BooleanField(read_only=True)
 
