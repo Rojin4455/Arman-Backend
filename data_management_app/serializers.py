@@ -510,27 +510,19 @@ class PurchaseCreateSerializer(serializers.Serializer):
             total_amount=total_amount,
         )
 
-        service_ids = []
         for service in services_data:
             service_id = service['id']
             service_obj = Service.objects.get(id=service_id)
             pricing_plan = service['price_plan']
-            service_ids.append(service_id)
 
             purchased_service_obj=PurchasedService.objects.create(
                 purchase=purchase,
-                # service=service_obj,
-                # price_plan=pricing_plan,
                 service_name=service_obj.name,
                 description=service_obj.description
-                # plan_name=pricing_plan.name,
-                # discount=pricing_plan.discount,
-                # total_amount=pricing_plan.base_price
             )
 
             print(pricing_plan, 'pricinggggddd')
 
-            # pricing_plan_obj = PricingOption.objects.get(id=pricing_plan.id)
             pricing_options = PricingOption.objects.filter(service=service_obj)
             selected_plan = None
             for option in pricing_options:
@@ -558,7 +550,6 @@ class PurchaseCreateSerializer(serializers.Serializer):
                         QuestionsAndAnswers.objects.create(
                             purchase=purchase,
                             purchased_service=purchased_service_obj,
-                            # question=question_obj,
                             bool_ans=q['ans'],
                             question_name=question_obj.text,
                             question_type=question_obj.type,
@@ -568,7 +559,6 @@ class PurchaseCreateSerializer(serializers.Serializer):
                         qu_ans = QuestionsAndAnswers.objects.create(
                             purchase=purchase,
                             purchased_service=purchased_service_obj,
-                            # question=question_obj,
                             bool_ans=q['ans'],
                             question_name=question_obj.text,
                             question_type=question_obj.type,
@@ -582,7 +572,6 @@ class PurchaseCreateSerializer(serializers.Serializer):
                                     qu_ans=qu_ans,
                                     label=question_opt_obj.label,
                                     value=question_opt_obj.value,
-                                    # question_option=question_opt_obj
                                 )
                             except QuestionOption.DoesNotExist:
                                 raise serializers.ValidationError(
@@ -592,7 +581,6 @@ class PurchaseCreateSerializer(serializers.Serializer):
                         qu_ans = QuestionsAndAnswers.objects.create(
                             purchase=purchase,
                             purchased_service=purchased_service_obj,
-                            # question=question_obj,
                             bool_ans=q['ans'],
                             question_name=question_obj.text,
                             question_type=question_obj.type,
@@ -607,7 +595,6 @@ class PurchaseCreateSerializer(serializers.Serializer):
                                     qty=value,
                                     label=question_opt_obj.label,
                                     value=question_opt_obj.value,
-                                    # question_option=question_opt_obj
                                 )
                             except QuestionOption.DoesNotExist:
                                 raise serializers.ValidationError(
@@ -616,7 +603,6 @@ class PurchaseCreateSerializer(serializers.Serializer):
                 except Question.DoesNotExist:
                     raise serializers.ValidationError(f"Question with id {q['id']} not found")
 
-        # purchase.services.set(service_ids)
         return purchase
     
 class GlobalSettingsSerializer(serializers.ModelSerializer):

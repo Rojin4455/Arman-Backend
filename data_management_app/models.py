@@ -267,7 +267,6 @@ class QuestionOption(models.Model):
 
 class Purchase(models.Model):
     contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name="purchases")
-    # services = models.ManyToManyField(Service, related_name="purchases")
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     is_submited = models.BooleanField(default=False)
     signature = models.CharField(max_length=200, null=True, blank=True)
@@ -279,19 +278,12 @@ class Purchase(models.Model):
 
 class PurchasedService(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name="service_plans")
-    # service = models.ForeignKey(Service, on_delete=models.SET_NULL, null=True)
-    # price_plan = models.ForeignKey(PricingOption, on_delete=models.SET_NULL, related_name='purchases', null=True)
 
     # Snapshot of selected Service
     service_name = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
 
     selected_plan = models.ForeignKey('data_management_app.PurchasedServicePlan', on_delete=models.SET_NULL, related_name='selected_service', null=True)
-
-    # # Snapshot of selected PricingOption
-    # plan_name = models.CharField(max_length=100, null=True, blank=True)
-    # discount = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    # total_amount = models.DecimalField(max_digits=10, decimal_places=2,null=True, blank=True)
 
 class PurchasedServicePlan(models.Model):
     purchased_service = models.ForeignKey(PurchasedService, on_delete=models.PROTECT, null=True, related_name="service_feature_plans")
@@ -313,7 +305,6 @@ class PlanFeature(models.Model):
 class QuestionsAndAnswers(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name='answers')
     purchased_service = models.ForeignKey(PurchasedService, on_delete=models.CASCADE, related_name='answers', null=True, blank=True)
-    # question = models.ForeignKey(Question, on_delete=models.SET_NULL,null=True, related_name='questionsandanswers')
 
     question_name = models.CharField(max_length=500)
     question_type = models.CharField(max_length=200)
@@ -328,7 +319,6 @@ class QuestionsAndAnswers(models.Model):
 
 class QuestionOptionAnswers(models.Model):
     qu_ans = models.ForeignKey(QuestionsAndAnswers, on_delete=models.CASCADE)
-    # question_option = models.ForeignKey(QuestionOption, on_delete=models.SET_NULL, related_name='answers', null=True, blank=True)
 
     value = models.CharField(max_length=200)
     label = models.CharField(max_length=200, blank=True)
