@@ -267,7 +267,7 @@ class QuestionOption(models.Model):
 
 class Purchase(models.Model):
     contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name="purchases")
-    services = models.ManyToManyField(Service, related_name="purchases")
+    # services = models.ManyToManyField(Service, related_name="purchases")
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     is_submited = models.BooleanField(default=False)
     signature = models.CharField(max_length=200, null=True, blank=True)
