@@ -3,7 +3,7 @@ from django.db import transaction
 from .models import (
     Service, Feature, PricingOption, PricingOptionFeature, 
     Question, QuestionOption, Contact, Purchase, GlobalSettings, PurchasedService, QuestionsAndAnswers, QuestionOptionAnswers,PurChasedServiceFeature,
-    PurchasedServicePlan, PlanFeature
+    PurchasedServicePlan, PlanFeature, CustomProduct
 )
 
 class ContactSerializer(serializers.ModelSerializer):
@@ -456,10 +456,11 @@ class PurchasedServiceSerializer(serializers.ModelSerializer):
 class PurchaseDetailSerializer(serializers.ModelSerializer):
     contact = ContactSerializer()
     services = serializers.SerializerMethodField()
+    custom_products = serializers.SerializerMethodField()
 
     class Meta:
         model = Purchase
-        fields = ['id', 'contact', 'services', 'total_amount', 'is_submited', 'signature']
+        fields = ['id', 'contact', 'services', 'total_amount', 'is_submited', 'signature', 'custom_products']
 
     def get_services(self, obj):
         return PurchasedServiceSerializer(
@@ -467,6 +468,10 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
             many=True,
             context={'purchase': obj}
         ).data
+    
+    def get_custom_products(self, obj):
+        custom_products = obj.custom_products.all()
+        return CustomProductSerializer(custom_products, many=True).data
         
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -491,12 +496,18 @@ class ServiceWithAnswersInputSerializer(serializers.Serializer):
     price_plan = serializers.PrimaryKeyRelatedField(queryset=PricingOption.objects.all())
     questions = QuestionAnswerInputSerializer(many=True)
 
+class CustomProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomProduct
+        exclude = ['purchase']
+
 class PurchaseCreateSerializer(serializers.Serializer):
     contact = serializers.SlugRelatedField(
         slug_field='contact_id',
         queryset=Contact.objects.all()
     )
     services = ServiceWithAnswersInputSerializer(many=True)
+    custom_product = CustomProductSerializer(many=True, required=False)
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     is_submited = serializers.BooleanField(read_only=True)
 
@@ -504,6 +515,7 @@ class PurchaseCreateSerializer(serializers.Serializer):
         contact = validated_data['contact']
         total_amount = validated_data['total_amount']
         services_data = validated_data['services']
+        custom_products = validated_data.get('custom_products', [])
 
         purchase = Purchase.objects.create(
             contact=contact,
@@ -602,9 +614,15 @@ class PurchaseCreateSerializer(serializers.Serializer):
                                 )
                 except Question.DoesNotExist:
                     raise serializers.ValidationError(f"Question with id {q['id']} not found")
+        if custom_products:
+            print(custom_products, 'hiii')
+            for custom_product in custom_products:
+                CustomProduct.objects.create(purchase=purchase, product_name=custom_product.get('product_name'), description=custom_product.get('description'), price=custom_product.get('price'))
+        else:
+            print('nOO custom product')
 
         return purchase
-    
+        
 class GlobalSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = GlobalSettings

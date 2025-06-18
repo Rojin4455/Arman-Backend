@@ -324,3 +324,8 @@ class QuestionOptionAnswers(models.Model):
     label = models.CharField(max_length=200, blank=True)
     qty = models.CharField(max_length=200, null=True, blank=True)
     
+class CustomProduct(models.Model):
+    purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name='custom_products')
+    product_name = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+    price = models.IntegerField()
