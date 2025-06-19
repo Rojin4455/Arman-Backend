@@ -506,10 +506,20 @@ class PurchaseCreateSerializer(serializers.Serializer):
         slug_field='contact_id',
         queryset=Contact.objects.all()
     )
-    services = ServiceWithAnswersInputSerializer(many=True)
+    services = ServiceWithAnswersInputSerializer(many=True,required=False)
     custom_products = CustomProductSerializer(many=True, required=False)
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     is_submited = serializers.BooleanField(read_only=True)
+
+    def validate(self, data):
+        services = data.get('services', [])
+        custom_products = data.get('custom_products', [])
+
+        if not services and not custom_products:
+            raise serializers.ValidationError(
+                "At least one of 'services' or 'custom_products' must be provided."
+            )
+        return data
 
     def create(self, validated_data):
         contact = validated_data['contact']

@@ -241,8 +241,10 @@ class FinalSubmition(APIView):
                     price_plan = service_data['price_plan']
                     purchased_plan.selected_plan = price_plan
                     purchased_plan.save()
-                    
 
+                    #add plan_name as a tag in ghl contact
+                    add_tags(contact_id, plan_name=price_plan.name)
+                    
                 except PurchasedService.DoesNotExist:
                     return Response(
                         {"detail": f"PurchasedServicePlan for service {service_data['service_id']} not found"},

@@ -23,7 +23,7 @@ def update_contact(contact_id, data):
         print(e, 'errorrr')
         return {'error':'Error while updating ghl contact'}
     
-def add_tags(contact_id):
+def add_tags(contact_id, plan_name=None):
     url = f'https://services.leadconnectorhq.com/contacts/{contact_id}'
     credentials = GHLAuthCredentials.objects.first()
 
@@ -31,6 +31,12 @@ def add_tags(contact_id):
     tags = contact.tags or []
     if "Quote Accepted" not in tags:
         tags.append("Quote Accepted")
+    
+    if plan_name:
+        tags.append(plan_name)
+
+    contact.tags = tags
+    contact.save()
 
 
     headers = {
