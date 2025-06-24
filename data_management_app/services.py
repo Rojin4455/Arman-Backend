@@ -116,7 +116,7 @@ def create_invoice( access_token, webhook_data, product_id, product_name):
         custom_data = webhook_data.get("customData", {})
         price = custom_data.get("Price", webhook_data.get("Quote Value", "0"))
         try:
-            amount = float(price) * 100  # Convert to cents for API
+            amount = float(price)
         except (ValueError, TypeError):
             amount = 0
         
