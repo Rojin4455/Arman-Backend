@@ -24,6 +24,12 @@ from .utils import update_contact, add_tags, add_custom_field
 from accounts.models import GHLAuthCredentials
 
 
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.views import View
+from data_management_app.services import get_or_create_product, create_invoice
+
+
 
 
 @csrf_exempt
@@ -274,3 +280,54 @@ class validate_locationId(APIView):
             return Response({'error':'Unauthenticated locationId'}, status=401)
         
         return Response({'status':True},status=200)
+    
+
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class GhlWebhookView(View):
+    def post(self, request):
+        try:
+            webhook_data = json.loads(request.body)
+            
+            # Get location ID from webhook data
+            location_id = webhook_data.get("locationId") or webhook_data.get("location", {}).get("id")
+            
+            if not location_id:
+                return JsonResponse({"error": "Location ID not found in webhook data"}, status=400)
+            
+            # Get authentication token
+            try:
+                token = GHLAuthCredentials.objects.get(location_id=location_id)
+                access_token = token.access_token
+            except GHLAuthCredentials.DoesNotExist:
+                return JsonResponse({"error": "Authentication credentials not found"}, status=400)
+            
+            # Check if product name exists in custom data
+            custom_data = webhook_data.get("customData", {})
+            product_name = custom_data.get("Product Name")
+            
+            if not product_name:
+                return JsonResponse({"error": "Product Name not found in custom data"}, status=400)
+            
+            # Get or create product
+            product_id = get_or_create_product(access_token, location_id, product_name, custom_data)
+            
+            if not product_id:
+                return JsonResponse({"error": "Failed to get or create product"}, status=500)
+            
+            # Create invoice
+            invoice_result = create_invoice(access_token, webhook_data, product_id, product_name)
+
+            print("invoice result: :", invoice_result)
+            
+            if invoice_result:
+                return JsonResponse({"success": True, "invoice_id": invoice_result.get("id")})
+            else:
+                return JsonResponse({"error": "Failed to create invoice"}, status=500)
+                
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON data"}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+    
