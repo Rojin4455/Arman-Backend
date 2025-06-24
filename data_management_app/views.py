@@ -331,3 +331,18 @@ class GhlWebhookView(View):
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
     
+
+class PurchasedServiceDelete(APIView):
+    def delete(self, request, id):
+        try:
+            service=PurchasedService.objects.get(id=id)
+            purchase_id = service.purchase.id
+            service.delete()
+            try:
+                purchase = Purchase.objects.get(id=purchase_id)
+                serializer = PurchaseDetailSerializer(purchase)
+                return Response(serializer.data, status=200)
+            except Purchase.DoesNotExist:
+                return Response({'error':'not found'}, status=404)
+        except PurchasedService.DoesNotExist:
+            return Response({'error': 'Purchased service not found'}, status=status.HTTP_404_NOT_FOUND)
