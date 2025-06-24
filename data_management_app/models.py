@@ -286,7 +286,7 @@ class PurchasedService(models.Model):
     selected_plan = models.ForeignKey('data_management_app.PurchasedServicePlan', on_delete=models.SET_NULL, related_name='selected_service', null=True)
 
 class PurchasedServicePlan(models.Model):
-    purchased_service = models.ForeignKey(PurchasedService, on_delete=models.PROTECT, null=True, related_name="service_feature_plans")
+    purchased_service = models.ForeignKey(PurchasedService, on_delete=models.CASCADE, null=True, related_name="service_feature_plans")
 
     name = models.CharField(max_length=100, null=True, blank=True)
     discount = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
