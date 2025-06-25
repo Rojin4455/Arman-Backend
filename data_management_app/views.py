@@ -198,6 +198,19 @@ class CreatePurchaseView(APIView):
             return Response({"message": "Purchase created successfully", "id": purchase.id}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    def put(self, request):
+        purchase_id = request.data.get("purchase_id")
+        try:
+            purchase = Purchase.objects.get(id=purchase_id)
+        except Purchase.DoesNotExist:
+            return Response({'error': 'Purchase not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = PurchaseCreateSerializer(instance=purchase, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'Services added successfully'}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 class ReviewView(APIView):
     def get(self, request, id):
         try:
