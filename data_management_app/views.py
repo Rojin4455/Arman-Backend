@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from .models import Service, GlobalSettings, Purchase, PurchasedService, Feature, PurChasedServiceFeature, PricingOptionFeature
+from .models import Service, GlobalSettings, Purchase, PurchasedService, CustomProduct
 from .serializers import ServiceSerializer
 from .serializers import PurchaseCreateSerializer, GlobalSettingsSerializer, PurchaseDetailSerializer, FinalSubmissionSerializer
 from rest_framework.views import APIView
@@ -358,4 +358,19 @@ class PurchasedServiceDelete(APIView):
             except Purchase.DoesNotExist:
                 return Response({'error':'not found'}, status=404)
         except PurchasedService.DoesNotExist:
+            return Response({'error': 'Purchased service not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+class CustomProductDelete(APIView):
+    def delete(self, request, id):
+        try:
+            cumstom_product=CustomProduct.objects.get(id=id)
+            purchase_id = cumstom_product.purchase.id
+            cumstom_product.delete()
+            try:
+                purchase = Purchase.objects.get(id=purchase_id)
+                serializer = PurchaseDetailSerializer(purchase)
+                return Response(serializer.data, status=200)
+            except Purchase.DoesNotExist:
+                return Response({'error':'not found'}, status=404)
+        except CustomProduct.DoesNotExist:
             return Response({'error': 'Purchased service not found'}, status=status.HTTP_404_NOT_FOUND)
