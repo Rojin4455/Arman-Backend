@@ -3,7 +3,7 @@ from django.db import transaction
 from .models import (
     Service, Feature, PricingOption, PricingOptionFeature, 
     Question, QuestionOption, Contact, Purchase, GlobalSettings, PurchasedService, QuestionsAndAnswers, QuestionOptionAnswers,PurChasedServiceFeature,
-    PurchasedServicePlan, PlanFeature, CustomProduct
+    PurchasedServicePlan, PlanFeature, CustomProduct, Address
 )
 
 class ContactSerializer(serializers.ModelSerializer):
@@ -763,3 +763,8 @@ class FinalSubmissionSerializer(serializers.Serializer):
         except Purchase.DoesNotExist:
             raise serializers.ValidationError("Purchase not found.")
         return data
+
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = '__all__'

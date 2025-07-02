@@ -8,8 +8,8 @@ from data_management_app.models import WebhookLog
 from data_management_app.tasks import handle_webhook_event
 from rest_framework.generics import ListAPIView
 from django.db.models import Q
-from .models import Contact
-from .serializers import ContactSerializer
+from .models import Contact, Address
+from .serializers import ContactSerializer, AddressSerializer
 from .pagination import ContactPagination
 from rest_framework import viewsets, status
 from rest_framework.response import Response
@@ -374,3 +374,11 @@ class CustomProductDelete(APIView):
                 return Response({'error':'not found'}, status=404)
         except CustomProduct.DoesNotExist:
             return Response({'error': 'Purchased service not found'}, status=status.HTTP_404_NOT_FOUND)
+
+class AddressByContactView(APIView):
+    def get(self, request, contact_id):
+        if not contact_id:
+            return Response({'error': 'contact_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        addresses = Address.objects.filter(contact=contact_id)
+        serializer = AddressSerializer(addresses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

@@ -3,8 +3,10 @@ import time
 from typing import List, Dict, Any, Optional
 from django.utils.dateparse import parse_datetime
 from django.db import transaction
-from data_management_app.models import Contact
+from data_management_app.models import Contact, Address
 from accounts.models import GHLAuthCredentials
+from django.core.exceptions import ObjectDoesNotExist
+import re
 
 
 def fetch_all_contacts(location_id: str, access_token: str = None) -> List[Dict[str, Any]]:
@@ -146,6 +148,7 @@ def fetch_all_contacts(location_id: str, access_token: str = None) -> List[Dict[
     print(f"\nTotal contacts retrieved: {len(all_contacts)}")
 
     sync_contacts_to_db(all_contacts)
+    fetch_contacts_locations(all_contacts, location_id, access_token)
     # return all_contacts
 
 
@@ -207,4 +210,183 @@ def sync_contacts_to_db(contact_data):
     print(f"{len(existing_ids)} existing contacts updated.")
 
 
+
+def fetch_contacts_locations(contact_data: list, location_id: str, access_token: str) -> dict:
+    # Fetch location custom fields
+    location_custom_fields = fetch_location_custom_fields(location_id, access_token)
+
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {access_token}",
+        "Version": "2021-07-28"
+    }
+
+    for contact in contact_data:
+        contact_id = contact.get("id")
+        if not contact_id:
+            continue
+        url = f"https://services.leadconnectorhq.com/contacts/{contact_id}"
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code != 200:
+                print(f"Error fetching contact details for {contact_id}: {response.status_code}")
+                print(f"Error details: {response.text}")
+                continue
+            data = response.json()
+            contact_detail = data.get('contact', {})
+            custom_fields = contact_detail.get('customFields', [])
+            if custom_fields and any(cf.get('value') for cf in custom_fields):
+                create_address_from_custom_fields(contact_id, custom_fields, location_custom_fields)
+        except requests.exceptions.RequestException as e:
+            print(f"Request failed for {contact_id}: {e}")
+            continue
+
+
+def fetch_location_custom_fields(location_id: str, access_token: str) -> dict:
+    """
+    Fetch custom fields for a given location from GoHighLevel API and return a dict with id as key and a dict of name, fieldKey, parentId as value.
+
+    Args:
+        location_id (str): The location ID for the subaccount
+        access_token (str): Bearer token for authentication
+
+    Returns:
+        dict: {id: {"name": ..., "fieldKey": ..., "parentId": ...}, ...}
+    Raises:
+        Exception: If the API request fails
+    """
+    url = f"https://services.leadconnectorhq.com/locations/{location_id}/customFields?model=contact"
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {access_token}",
+        "Version": "2021-07-28"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        fields = data.get("customFields", [])
+        return {
+            f.get("id"): {
+                "name": f.get("name"),
+                "fieldKey": f.get("fieldKey"),
+                "parentId": f.get("parentId")
+            }
+            for f in fields if f.get("id")
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed: {e}")
+        raise Exception(f"Failed to fetch custom fields: {e}")
+
+
+def create_address_from_custom_fields(contact_id: str, custom_fields_list: list, location_custom_fields: dict):
+    """
+    Create Address instances in the DB from a contact's custom fields dict, using the location_custom_fields mapping.
+    Args:
+        contact_id (str): The contact's unique ID (should exist in Contact model)
+        custom_fields_list (list): List of dicts with 'id' and 'value' for each custom field
+        location_id (str): The location ID for the subaccount
+        access_token (str): Bearer token for authentication
+    Returns:
+        None (prints sync summary)
+    """
+
+    # Define location_index (parentId to order)
+    location_index = {
+        "QmYk134LkK2hownvL1sE": 1,
+        "6K2aY5ghsAeCNhNJBcTt": 2,
+        "4Vx8hTmhneL3aHhQOobV": 3,
+        "ou8hGYQTDuirxtCD2Bhs": 4,
+        "IVh5iKD6A7xB6JOCqocG": 5,
+        "vsrkHtczxuyyIg9CG8Op": 6,
+        "tt28EWemd1DyWpzqQKA3": 7,
+        "1ERLsUjWpMrUfHZx1oIr": 8,
+        "cCplI0tAY2q2MfCM5yco": 9,
+        "cdIPlyq0J77lx2GlU88G": 10
+    }
+
+    # Group custom fields by parentId (location)
+    address_fields = {pid: {} for pid in location_index}
+    for field in custom_fields_list:
+        field_id = field.get('id')
+        value = field.get('value')
+        meta = location_custom_fields.get(field_id, {})
+        parent_id = meta.get('parentId')
+        field_key = meta.get('fieldKey') or meta.get('name')
+        if parent_id and parent_id in location_index and field_key:
+            # Remove 'contact.' prefix and strip numeric suffix (e.g., _0, _1, _2, etc.)
+            clean_key = field_key.replace('contact.', '')
+            base_key = re.sub(r'_[0-9]+$', '', clean_key)
+            address_fields[parent_id][base_key] = value  # last value wins if duplicate
+
+    # Prepare address dicts for sync_addresses_to_db
+    all_address_model_fields = ['state', 'street_address', 'city', 'postal_code', 'gate_code', 'number_of_floors', 'property_sqft', 'property_type']
+    address_dicts = []
+    for parent_id, field_map in address_fields.items():
+        if not field_map:
+            continue
+        address_data = {field: field_map.get(field) for field in all_address_model_fields}
+        # Convert types if needed
+        if address_data['number_of_floors'] is not None:
+            try:
+                address_data['number_of_floors'] = int(address_data['number_of_floors'])
+            except Exception:
+                address_data['number_of_floors'] = None
+        if address_data['property_sqft'] is not None:
+            try:
+                address_data['property_sqft'] = int(address_data['property_sqft'])
+            except Exception:
+                address_data['property_sqft'] = None
+        address_data['address_id'] = parent_id
+        address_data['order'] = location_index[parent_id]
+        address_data['name'] = f"Address {location_index[parent_id]}"
+        address_data['contact_id'] = contact_id
+        address_dicts.append(address_data)
+    # Call sync_addresses_to_db
+    sync_addresses_to_db(address_dicts)
+
+
+
+
+def sync_addresses_to_db(address_data):
+    """
+    Syncs address data from API into the local Address model using bulk upsert.
+    Args:
+        address_data (list): List of address dicts, each must include contact_id and address_id
+    """
+
+    addresses_to_create = []
+    updated_count = 0
+    # Build a set of (contact_id, address_id) for existing addresses
+    existing = set(
+        Address.objects.filter(
+            contact__contact_id__in=[a['contact_id'] for a in address_data],
+            address_id__in=[a['address_id'] for a in address_data]
+        ).values_list('contact__contact_id', 'address_id')
+    )
+
+    for item in address_data:
+        contact_id = item.get('contact_id')
+        address_id = item.get('address_id')
+        if not contact_id or not address_id:
+            continue
+        try:
+            contact = Contact.objects.get(contact_id=contact_id)
+        except ObjectDoesNotExist:
+            print(f"Contact with id {contact_id} does not exist. Skipping address.")
+            continue
+        address_fields = item.copy()
+        address_fields.pop('contact_id', None)
+        address_fields.pop('address_id', None)
+        if (contact_id, address_id) in existing:
+            # Update existing address
+            Address.objects.filter(contact=contact, address_id=address_id).update(**address_fields)
+            updated_count += 1
+        else:
+            addresses_to_create.append(Address(contact=contact, address_id=address_id, **address_fields))
+    if addresses_to_create:
+        with transaction.atomic():
+            Address.objects.bulk_create(addresses_to_create, ignore_conflicts=True)
+    print(f"{len(addresses_to_create)} new addresses created.")
+    print(f"{updated_count} existing addresses updated.")
 

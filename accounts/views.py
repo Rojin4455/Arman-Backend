@@ -22,7 +22,7 @@ BASE_API_URL = settings.BASE_API_URL
 
 
 def auth_connect(request):
-    auth_url = ("https://marketplace.leadconnectorhq.com/oauth/chooselocation?response_type=code&"
+    auth_url = ("https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&"
                 f"redirect_uri={REDIRECT_URI}&"
                 f"client_id={CLIENT_ID}&"
                 f"scope={SCOPES}"
