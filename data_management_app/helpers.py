@@ -1,5 +1,6 @@
 import requests
 from accounts.models import GHLAuthCredentials
+from accounts.utils import fetch_contacts_locations
 from data_management_app.models import Contact
 
 def create_or_update_contact(data):
@@ -17,6 +18,8 @@ def create_or_update_contact(data):
             "location_id": data.get("locationId"),
         }
     )
+    cred = GHLAuthCredentials.objects.first()
+    fetch_contacts_locations([data], data.get("locationId"), data.get("locationId"), cred.access_token)
     print("Contact created/updated:", contact_id)
 
 def delete_contact(data):
