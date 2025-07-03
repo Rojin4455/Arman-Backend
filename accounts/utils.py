@@ -255,6 +255,9 @@ def fetch_contacts_locations(contact_data: list, location_id: str, access_token:
             custom_fields = contact_detail.get('customFields', [])
             if custom_fields and any(cf.get('value') for cf in custom_fields):
                 create_address_from_custom_fields(contact_id, custom_fields, location_custom_fields)
+                # Add a small delay to be respectful to the API
+            time.sleep(0.2)
+
         except requests.exceptions.RequestException as e:
             print(f"Request failed for {contact_id}: {e}")
             continue
