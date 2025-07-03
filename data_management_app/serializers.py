@@ -506,7 +506,7 @@ class PurchaseCreateSerializer(serializers.Serializer):
         slug_field='contact_id',
         queryset=Contact.objects.all()
     )
-    address = serializers.PrimaryKeyRelatedField(queryset=Address.objects.all())
+    address = serializers.PrimaryKeyRelatedField(queryset=Address.objects.all(), allow_null=True, required=False)
     services = ServiceWithAnswersInputSerializer(many=True,required=False)
     custom_products = CustomProductSerializer(many=True, required=False)
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
