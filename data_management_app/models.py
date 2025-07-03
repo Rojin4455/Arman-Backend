@@ -262,6 +262,27 @@ class QuestionOption(models.Model):
 
 
 
+class Address(models.Model):
+    PROPERTY_TYPE_CHOICES = [
+        ('residential', 'Residential'),
+        ('commercial', 'Commercial'),
+    ]
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='contact_location')
+    address_id = models.CharField(max_length=500)
+    name = models.CharField(max_length=100, blank=True, null=True, help_text="e.g. Home, Office, etc.")
+    order = models.PositiveIntegerField(default=0, help_text="Order of this location for the contact")
+    state = models.CharField(max_length=100, blank=True, null=True)
+    street_address = models.CharField(max_length=255, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    postal_code = models.CharField(max_length=20, blank=True, null=True)
+    gate_code = models.CharField(max_length=20, blank=True, null=True)
+    number_of_floors = models.PositiveIntegerField(blank=True, null=True)
+    property_sqft = models.PositiveIntegerField(blank=True, null=True)
+    property_type = models.CharField(max_length=20, choices=PROPERTY_TYPE_CHOICES, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.street_address}, {self.city}, {self.state}"
+
 
 
 
@@ -270,6 +291,7 @@ class Purchase(models.Model):
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     is_submited = models.BooleanField(default=False)
     signature = models.CharField(max_length=200, null=True, blank=True)
+    address = models.ForeignKey(Address, on_delete=models.CASCADE, null=True, blank=True, related_name="purchased_address")
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -330,24 +352,3 @@ class CustomProduct(models.Model):
     description = models.TextField(blank=True, null=True)
     price = models.IntegerField()
 
-
-class Address(models.Model):
-    PROPERTY_TYPE_CHOICES = [
-        ('residential', 'Residential'),
-        ('commercial', 'Commercial'),
-    ]
-    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='contact_location')
-    address_id = models.CharField(max_length=500)
-    name = models.CharField(max_length=100, blank=True, null=True, help_text="e.g. Home, Office, etc.")
-    order = models.PositiveIntegerField(default=0, help_text="Order of this location for the contact")
-    state = models.CharField(max_length=100, blank=True, null=True)
-    street_address = models.CharField(max_length=255, blank=True, null=True)
-    city = models.CharField(max_length=100, blank=True, null=True)
-    postal_code = models.CharField(max_length=20, blank=True, null=True)
-    gate_code = models.CharField(max_length=20, blank=True, null=True)
-    number_of_floors = models.PositiveIntegerField(blank=True, null=True)
-    property_sqft = models.PositiveIntegerField(blank=True, null=True)
-    property_type = models.CharField(max_length=20, choices=PROPERTY_TYPE_CHOICES, blank=True, null=True)
-
-    def __str__(self):
-        return f"{self.street_address}, {self.city}, {self.state}"

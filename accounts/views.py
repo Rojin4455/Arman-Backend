@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
+from accounts.tasks import fetch_all_contacts_task
 from accounts.utils import fetch_all_contacts
 
 
@@ -75,7 +76,7 @@ def tokens(request):
             }
         )
 
-        fetch_all_contacts(response_data.get("locationId"), response_data.get("access_token"))
+        fetch_all_contacts_task.delay(response_data.get("locationId"), response_data.get("access_token"))
         
         
         

@@ -506,6 +506,7 @@ class PurchaseCreateSerializer(serializers.Serializer):
         slug_field='contact_id',
         queryset=Contact.objects.all()
     )
+    address = serializers.PrimaryKeyRelatedField(queryset=Address.objects.all())
     services = ServiceWithAnswersInputSerializer(many=True,required=False)
     custom_products = CustomProductSerializer(many=True, required=False)
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
@@ -523,12 +524,14 @@ class PurchaseCreateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         contact = validated_data['contact']
+        address = validated_data['address']
         total_amount = validated_data['total_amount']
         services_data = validated_data['services']
         custom_products = validated_data.get('custom_products', [])
 
         purchase = Purchase.objects.create(
             contact=contact,
+            address=address,
             total_amount=total_amount,
         )
 
