@@ -220,8 +220,10 @@ def fetch_contacts_locations(contact_data: list, location_id: str, access_token:
         "Authorization": f"Bearer {access_token}",
         "Version": "2021-07-28"
     }
+    total_contacts = len(contact_data)
 
-    for contact in contact_data:
+    for idx, contact in enumerate(contact_data, 1):
+        print(f"Processing contact {idx}/{total_contacts}")  # Progress for each contact
         contact_id = contact.get("id")
         if not contact_id:
             continue
@@ -234,6 +236,22 @@ def fetch_contacts_locations(contact_data: list, location_id: str, access_token:
                 continue
             data = response.json()
             contact_detail = data.get('contact', {})
+            # --- Address 0 extraction ---
+            address_fields = {
+                'street_address': contact_detail.get('address1'),
+                'city': contact_detail.get('city'),
+                'state': contact_detail.get('state'),
+                'postal_code': contact_detail.get('postalCode'),
+                # 'country': contact_detail.get('country'),  # Uncomment if Address model has country
+                'address_id': 'address_0',
+                'order': 0,
+                'name': 'Address 0',
+                'contact_id': contact_id
+            }
+            # Only save if at least one address field is present
+            if any(address_fields.get(f) for f in ['street_address', 'city', 'state', 'postal_code']):
+                sync_addresses_to_db([address_fields])
+            # --- Custom fields addresses ---
             custom_fields = contact_detail.get('customFields', [])
             if custom_fields and any(cf.get('value') for cf in custom_fields):
                 create_address_from_custom_fields(contact_id, custom_fields, location_custom_fields)
@@ -293,6 +311,7 @@ def create_address_from_custom_fields(contact_id: str, custom_fields_list: list,
 
     # Define location_index (parentId to order)
     location_index = {
+        "address_0": 0,
         "QmYk134LkK2hownvL1sE": 1,
         "6K2aY5ghsAeCNhNJBcTt": 2,
         "4Vx8hTmhneL3aHhQOobV": 3,
