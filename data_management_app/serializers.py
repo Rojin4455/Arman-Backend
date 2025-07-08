@@ -453,14 +453,47 @@ class PurchasedServiceSerializer(serializers.ModelSerializer):
         data['price_plan'] = data['selected_plan']
         return data
 
+class AddressSingleLineSerializer(serializers.ModelSerializer):
+    single_line = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Address
+        fields = ['single_line']
+
+    def get_single_line(self, obj):
+        # Compose a single-line address string, skipping empty/null fields
+        parts = [
+            obj.name,
+            obj.street_address,
+            obj.city,
+            obj.state,
+            obj.postal_code
+        ]
+        # Only include parts that are not None and not empty after stripping
+        return ', '.join([str(p).strip() for p in parts if p and str(p).strip()])
+
 class PurchaseDetailSerializer(serializers.ModelSerializer):
     contact = ContactSerializer()
     services = serializers.SerializerMethodField()
     custom_products = serializers.SerializerMethodField()
+    address = serializers.SerializerMethodField()
 
     class Meta:
         model = Purchase
-        fields = ['id', 'contact', 'services', 'total_amount', 'is_submited', 'signature', 'custom_products']
+        fields = ['id', 'contact', 'address', 'services', 'total_amount', 'is_submited', 'signature', 'custom_products']
+
+    def get_address(self, obj):
+        address = obj.address
+        if not address:
+            return None
+        parts = [
+            address.name,
+            address.street_address,
+            address.city,
+            address.state,
+            address.postal_code
+        ]
+        return ', '.join([str(p).strip() for p in parts if p and str(p).strip()])
 
     def get_services(self, obj):
         return PurchasedServiceSerializer(
