@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
+from accounts.tasks import fetch_all_contacts_task
 from accounts.utils import fetch_all_contacts
 
 
@@ -22,7 +23,7 @@ BASE_API_URL = settings.BASE_API_URL
 
 
 def auth_connect(request):
-    auth_url = ("https://marketplace.leadconnectorhq.com/oauth/chooselocation?response_type=code&"
+    auth_url = ("https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&"
                 f"redirect_uri={REDIRECT_URI}&"
                 f"client_id={CLIENT_ID}&"
                 f"scope={SCOPES}"
@@ -75,7 +76,7 @@ def tokens(request):
             }
         )
 
-        fetch_all_contacts(response_data.get("locationId"), response_data.get("access_token"))
+        fetch_all_contacts_task.delay(response_data.get("locationId"), response_data.get("access_token"))
         
         
         

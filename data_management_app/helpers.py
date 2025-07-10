@@ -1,6 +1,7 @@
 import requests
 from accounts.models import GHLAuthCredentials
-from data_management_app.models import Contact
+from accounts.utils import fetch_contacts_locations
+from data_management_app.models import Contact, Address
 
 def create_or_update_contact(data):
     contact_id = data.get("id")
@@ -17,13 +18,17 @@ def create_or_update_contact(data):
             "location_id": data.get("locationId"),
         }
     )
+    cred = GHLAuthCredentials.objects.first()
+    fetch_contacts_locations([data], data.get("locationId"), cred.access_token)
     print("Contact created/updated:", contact_id)
 
 def delete_contact(data):
     contact_id = data.get("id")
     try:
         contact = Contact.objects.get(contact_id=contact_id)
+        # Delete all addresses related to this contact
+        Address.objects.filter(contact=contact).delete()
         contact.delete()
-        print("Contact deleted:", contact_id)
+        print("Contact and related addresses deleted:", contact_id)
     except Contact.DoesNotExist:
         print("Contact not found for deletion:", contact_id)

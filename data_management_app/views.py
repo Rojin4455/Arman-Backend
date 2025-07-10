@@ -8,15 +8,15 @@ from data_management_app.models import WebhookLog
 from data_management_app.tasks import handle_webhook_event
 from rest_framework.generics import ListAPIView
 from django.db.models import Q
-from .models import Contact
-from .serializers import ContactSerializer
+from .models import Contact, Address
+from .serializers import ContactSerializer, AddressSerializer
 from .pagination import ContactPagination
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from .models import Service, GlobalSettings, Purchase, PurchasedService, Feature, PurChasedServiceFeature, PricingOptionFeature
+from .models import Service, GlobalSettings, Purchase, PurchasedService, CustomProduct
 from .serializers import ServiceSerializer
 from .serializers import PurchaseCreateSerializer, GlobalSettingsSerializer, PurchaseDetailSerializer, FinalSubmissionSerializer
 from rest_framework.views import APIView
@@ -198,6 +198,19 @@ class CreatePurchaseView(APIView):
             return Response({"message": "Purchase created successfully", "id": purchase.id}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    def put(self, request):
+        purchase_id = request.data.get("purchase_id")
+        try:
+            purchase = Purchase.objects.get(id=purchase_id)
+        except Purchase.DoesNotExist:
+            return Response({'error': 'Purchase not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = PurchaseCreateSerializer(instance=purchase, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'Services added successfully'}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 class ReviewView(APIView):
     def get(self, request, id):
         try:
@@ -331,3 +344,41 @@ class GhlWebhookView(View):
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
     
+
+class PurchasedServiceDelete(APIView):
+    def delete(self, request, id):
+        try:
+            service=PurchasedService.objects.get(id=id)
+            purchase_id = service.purchase.id
+            service.delete()
+            try:
+                purchase = Purchase.objects.get(id=purchase_id)
+                serializer = PurchaseDetailSerializer(purchase)
+                return Response(serializer.data, status=200)
+            except Purchase.DoesNotExist:
+                return Response({'error':'not found'}, status=404)
+        except PurchasedService.DoesNotExist:
+            return Response({'error': 'Purchased service not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+class CustomProductDelete(APIView):
+    def delete(self, request, id):
+        try:
+            cumstom_product=CustomProduct.objects.get(id=id)
+            purchase_id = cumstom_product.purchase.id
+            cumstom_product.delete()
+            try:
+                purchase = Purchase.objects.get(id=purchase_id)
+                serializer = PurchaseDetailSerializer(purchase)
+                return Response(serializer.data, status=200)
+            except Purchase.DoesNotExist:
+                return Response({'error':'not found'}, status=404)
+        except CustomProduct.DoesNotExist:
+            return Response({'error': 'Purchased service not found'}, status=status.HTTP_404_NOT_FOUND)
+
+class AddressByContactView(APIView):
+    def get(self, request, contact_id):
+        if not contact_id:
+            return Response({'error': 'contact_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        addresses = Address.objects.filter(contact=contact_id)
+        serializer = AddressSerializer(addresses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

@@ -3,7 +3,7 @@ from django.db import transaction
 from .models import (
     Service, Feature, PricingOption, PricingOptionFeature, 
     Question, QuestionOption, Contact, Purchase, GlobalSettings, PurchasedService, QuestionsAndAnswers, QuestionOptionAnswers,PurChasedServiceFeature,
-    PurchasedServicePlan, PlanFeature, CustomProduct
+    PurchasedServicePlan, PlanFeature, CustomProduct, Address
 )
 
 class ContactSerializer(serializers.ModelSerializer):
@@ -453,14 +453,47 @@ class PurchasedServiceSerializer(serializers.ModelSerializer):
         data['price_plan'] = data['selected_plan']
         return data
 
+class AddressSingleLineSerializer(serializers.ModelSerializer):
+    single_line = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Address
+        fields = ['single_line']
+
+    def get_single_line(self, obj):
+        # Compose a single-line address string, skipping empty/null fields
+        parts = [
+            obj.name,
+            obj.street_address,
+            obj.city,
+            obj.state,
+            obj.postal_code
+        ]
+        # Only include parts that are not None and not empty after stripping
+        return ', '.join([str(p).strip() for p in parts if p and str(p).strip()])
+
 class PurchaseDetailSerializer(serializers.ModelSerializer):
     contact = ContactSerializer()
     services = serializers.SerializerMethodField()
     custom_products = serializers.SerializerMethodField()
+    address = serializers.SerializerMethodField()
 
     class Meta:
         model = Purchase
-        fields = ['id', 'contact', 'services', 'total_amount', 'is_submited', 'signature', 'custom_products']
+        fields = ['id', 'contact', 'address', 'services', 'total_amount', 'is_submited', 'signature', 'custom_products']
+
+    def get_address(self, obj):
+        address = obj.address
+        if not address:
+            return None
+        parts = [
+            address.name,
+            address.street_address,
+            address.city,
+            address.state,
+            address.postal_code
+        ]
+        return ', '.join([str(p).strip() for p in parts if p and str(p).strip()])
 
     def get_services(self, obj):
         return PurchasedServiceSerializer(
@@ -506,6 +539,7 @@ class PurchaseCreateSerializer(serializers.Serializer):
         slug_field='contact_id',
         queryset=Contact.objects.all()
     )
+    address = serializers.PrimaryKeyRelatedField(queryset=Address.objects.all(), allow_null=True, required=False)
     services = ServiceWithAnswersInputSerializer(many=True,required=False)
     custom_products = CustomProductSerializer(many=True, required=False)
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
@@ -523,12 +557,14 @@ class PurchaseCreateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         contact = validated_data['contact']
+        address = validated_data['address']
         total_amount = validated_data['total_amount']
         services_data = validated_data['services']
         custom_products = validated_data.get('custom_products', [])
 
         purchase = Purchase.objects.create(
             contact=contact,
+            address=address,
             total_amount=total_amount,
         )
 
@@ -632,6 +668,106 @@ class PurchaseCreateSerializer(serializers.Serializer):
             print('nOO custom product')
 
         return purchase
+    
+    def update(self, instance, validated_data):
+        services_data = validated_data.get('services', [])
+        custom_products = validated_data.get('custom_products', [])
+
+        for service in services_data:
+            service_id = service['id']
+            service_obj = Service.objects.get(id=service_id)
+            pricing_plan = service['price_plan']
+
+            purchased_service_obj = PurchasedService.objects.create(
+                purchase=instance,
+                service_name=service_obj.name,
+                description=service_obj.description
+            )
+
+            pricing_options = PricingOption.objects.filter(service=service_obj)
+            selected_plan = None
+            for option in pricing_options:
+                purchased_pricing_plan_obj = PurchasedServicePlan.objects.create(
+                    purchased_service=purchased_service_obj,
+                    name=option.name,
+                    discount=option.discount
+                )
+
+                features = pricing_plan.selected_features.all()
+                for feat in features:
+                    p_feat_obj = PurChasedServiceFeature.objects.create(
+                        purchased_service=purchased_service_obj,
+                        name=feat.feature.name,
+                        description=feat.feature.description
+                    )
+                    PlanFeature.objects.create(
+                        purchased_service_plan=purchased_pricing_plan_obj,
+                        feature=p_feat_obj,
+                        is_included=feat.is_included
+                    )
+                if option == pricing_plan:
+                    selected_plan = purchased_pricing_plan_obj
+
+            purchased_service_obj.selected_plan = selected_plan
+            purchased_service_obj.save()
+
+            for q in service['questions']:
+                try:
+                    question_obj = Question.objects.get(id=q['id'])
+                    if question_obj.type == 'boolean':
+                        QuestionsAndAnswers.objects.create(
+                            purchase=instance,
+                            purchased_service=purchased_service_obj,
+                            bool_ans=q['ans'],
+                            question_name=question_obj.text,
+                            question_type=question_obj.type,
+                            unit_price=question_obj.unit_price
+                        )
+                    elif question_obj.type == 'extra_choice':
+                        qu_ans = QuestionsAndAnswers.objects.create(
+                            purchase=instance,
+                            purchased_service=purchased_service_obj,
+                            bool_ans=q['ans'],
+                            question_name=question_obj.text,
+                            question_type=question_obj.type,
+                            unit_price=question_obj.unit_price
+                        )
+                        for key, value in q.get('options', {}).items():
+                            question_opt_obj = QuestionOption.objects.get(question=question_obj, label__iexact=key)
+                            QuestionOptionAnswers.objects.create(
+                                qu_ans=qu_ans,
+                                label=question_opt_obj.label,
+                                value=question_opt_obj.value
+                            )
+                    else:
+                        qu_ans = QuestionsAndAnswers.objects.create(
+                            purchase=instance,
+                            purchased_service=purchased_service_obj,
+                            bool_ans=q['ans'],
+                            question_name=question_obj.text,
+                            question_type=question_obj.type,
+                            unit_price=question_obj.unit_price
+                        )
+                        for key, value in q.get('options', {}).items():
+                            question_opt_obj = QuestionOption.objects.get(question=question_obj, label__iexact=key)
+                            QuestionOptionAnswers.objects.create(
+                                qu_ans=qu_ans,
+                                label=question_opt_obj.label,
+                                value=question_opt_obj.value,
+                                qty=value
+                            )
+                except Question.DoesNotExist:
+                    raise serializers.ValidationError(f"Question with id {q['id']} not found")
+
+        for product in custom_products:
+            CustomProduct.objects.create(
+                purchase=instance,
+                product_name=product.get('product_name'),
+                description=product.get('description'),
+                price=product.get('price')
+            )
+
+        return instance
         
 class GlobalSettingsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -663,3 +799,8 @@ class FinalSubmissionSerializer(serializers.Serializer):
         except Purchase.DoesNotExist:
             raise serializers.ValidationError("Purchase not found.")
         return data
+
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = '__all__'

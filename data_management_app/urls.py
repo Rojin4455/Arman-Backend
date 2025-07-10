@@ -15,4 +15,7 @@ urlpatterns = [
     path('quotes/<int:quoteId>/submit/', FinalSubmition.as_view()),
     path('validate/location/', validate_locationId.as_view()),
     path("create-invoice-webhook",GhlWebhookView.as_view() , name="webhook"),
+    path('purchased-service/delete/<int:id>/', PurchasedServiceDelete.as_view()),
+    path('custom-product/delete/<int:id>/', CustomProductDelete.as_view()),
+    path('address/by-contact/<str:contact_id>/', AddressByContactView.as_view(), name='address-by-contact'),
 ]
