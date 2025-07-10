@@ -1,5 +1,6 @@
 import requests
 import pytz
+from data_management_app.models import Contact
 
 BST = pytz.timezone("America/Chicago")
 
@@ -111,6 +112,18 @@ def create_invoice( access_token, webhook_data, product_id, product_name):
         city = webhook_data.get("city", "")
         state = webhook_data.get("state", "")
         country = webhook_data.get("country", "")
+        contact = None
+        if contact_id:
+             try:
+                  contact = Contact.objects.get(contact_id=contact_id)
+             except:
+                  pass
+             
+        send_to = False
+             
+        if contact and "card authorized" in contact.tags:
+             send_to = True
+             
         
         # Get price from custom data or quote value
         custom_data = webhook_data.get("customData", {})
@@ -164,13 +177,21 @@ def create_invoice( access_token, webhook_data, product_id, product_name):
             },
             "issueDate": issue_date,
             "dueDate": due_date,
-            "sentTo": {
-                "email": [contact_email] if contact_email else []
-            },
+            # "sentTo": {
+            #     "email": [contact_email] if contact_email else []
+            # },
             "liveMode": True,
             "automaticTaxesEnabled": False,
             "invoiceNumberPrefix": "INV-"
         }
+
+        if send_to:
+             invoice_data["sentTo"] = {
+                  "email": [contact_email] if contact_email else [],
+                  "phone":[contact_phone] if contact_phone else []
+             }  
+
+
         
         # Remove empty email arrays to avoid API issues
         if not invoice_data["sentTo"]["email"]:
