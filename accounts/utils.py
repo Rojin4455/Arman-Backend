@@ -157,18 +157,16 @@ def fetch_all_contacts(location_id: str, access_token: str = None) -> List[Dict[
 def sync_contacts_to_db(contact_data):
     """
     Syncs contact data from API into the local Contact model using bulk upsert.
-    
+    Also deletes any Contact objects not present in the incoming contact_data.
     Args:
         contact_data (list): List of contact dicts from GoHighLevel API
     """
     contacts_to_create = []
-    existing_ids = set(Contact.objects.filter(contact_id__in=[c['id'] for c in contact_data]).values_list('contact_id', flat=True))
+    incoming_ids = set(c['id'] for c in contact_data)
+    existing_ids = set(Contact.objects.filter(contact_id__in=incoming_ids).values_list('contact_id', flat=True))
 
     for item in contact_data:
-        
         date_added = parse_datetime(item.get("dateAdded")) if item.get("dateAdded") else None
-        
-
         contact_obj = Contact(
             contact_id=item.get("id"),
             first_name=item.get("firstName"),
@@ -183,7 +181,6 @@ def sync_contacts_to_db(contact_data):
             location_id=item.get("locationId"),
             timestamp=date_added
         )
-
         if item.get("id") in existing_ids:
             # Update existing contact
             Contact.objects.filter(contact_id=item["id"]).update(
@@ -206,8 +203,12 @@ def sync_contacts_to_db(contact_data):
         with transaction.atomic():
             Contact.objects.bulk_create(contacts_to_create, ignore_conflicts=True)
 
+    # Delete contacts not present in the incoming data
+    deleted_count, _ = Contact.objects.exclude(contact_id__in=incoming_ids).delete()
+
     print(f"{len(contacts_to_create)} new contacts created.")
     print(f"{len(existing_ids)} existing contacts updated.")
+    print(f"{deleted_count} contacts deleted as they were not present in the latest data.")
 
 
 
