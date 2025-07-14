@@ -486,7 +486,6 @@ class PurchaseDetailSerializer(serializers.ModelSerializer):
         if not address:
             return None
         parts = [
-            address.name,
             address.street_address,
             address.city,
             address.state,
